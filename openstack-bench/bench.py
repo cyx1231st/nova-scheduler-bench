@@ -65,15 +65,15 @@ class BenchDriverBase(object):
             self.conf("host", self.meta.host)
         if not self.meta.is_console:
             self.conf("logging_default_format_string",
-                      "%(asctime)s.%(msecs)04d %(levelname)s %(name)s [-] "
+                      "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [-] "
                       "%(instance)s%(message)s")
             self.conf("logging_debug_format_suffix",
                       "from (pid=%(process)d) %(funcName)s "
                       "%(pathname)s:%(lineno)d")
             self.conf("logging_exception_prefix",
-                      "%(asctime)s.%(msecs)04d TRACE %(name)s %(instance)s")
+                      "%(asctime)s.%(msecs)03d TRACE %(name)s %(instance)s")
             self.conf("logging_context_format_string",
-                      "%(asctime)s.%(msecs)04d %(levelname)s %(name)s "
+                      "%(asctime)s.%(msecs)03d %(levelname)s %(name)s "
                       "[%(request_id)s %(user_name)s %(project_name)s] "
                       "%(instance)s%(message)s")
             self.conf("log_file",

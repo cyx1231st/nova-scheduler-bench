@@ -2,3 +2,4 @@
 *.png
 *.log
 results*
+.requests

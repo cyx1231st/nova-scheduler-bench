@@ -8,7 +8,7 @@ from os import path
 
 import draw
 
-SECONDS_OFFSET=True
+SECONDS_OFFSET=False
 
 class LogLine(object):
     def __init__(self, line, service, host, filename, offset):
@@ -599,6 +599,11 @@ class StateMachinesParser(object):
         end_time = max([query[-1].seconds for query in self.all_queries])
         self.wall_clock_total = end_time - start_time
 
+        _successful_lapse = []
+        for q in self.direct_successful_queries:
+            _successful_lapse.append(q[-1].seconds - q[0].seconds)
+        self.wall_clock_query = sum(_successful_lapse) / float(len(_successful_lapse))
+
         """ log sampling
         print_query(self.direct_successful_queries[0])
         print_query(self.direct_nvh_queries[0])
@@ -1050,6 +1055,7 @@ def generate_report(state_machines, schedulers, computes):
     time_wall_clock_conductor = sm_parser.intervals_conductor.wall_time()
     time_wall_clock_scheduler = sm_parser.intervals_sched.wall_time()
     time_wall_clock_compute = sm_parser.intervals_compute.wall_time()
+    time_wall_clock_query = sm_parser.wall_clock_query 
 
     time_query_inapi_avg = sm_parser.intervals_direct_inapi.average()
     time_query_a_con_avg = sm_parser.intervals_direct_a_con.average()
@@ -1125,6 +1131,7 @@ def generate_report(state_machines, schedulers, computes):
     print("wall clock conductor:      %7.5f" % time_wall_clock_conductor)
     print("wall clock scheduler:      %7.5f" % time_wall_clock_scheduler)
     print("wall clock compute:        %7.5f" % time_wall_clock_compute)
+    print("wall clock query:          %7.5f" % time_wall_clock_query)
     print("")
     print("time inapi avg:            %7.5f" % time_query_inapi_avg)
     print("time a-con avg:            %7.5f" % time_query_a_con_avg)
