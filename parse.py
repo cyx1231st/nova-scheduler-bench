@@ -1037,7 +1037,7 @@ def print_query(query):
         print(lg)
 
 
-def generate_report(state_machines, schedulers, computes):
+def generate_report(args, state_machines, schedulers, computes):
     ## number_of_schedulers
     number_of_active_schedulers = len(schedulers)
     ## number_of_computes
@@ -1118,86 +1118,194 @@ def generate_report(state_machines, schedulers, computes):
     request_failure_percent = count_api_failed_requests \
         / float(count_total_requests) * 100
 
-    print("")
-    print(" >> FINAL REPORT:")
-    print("active schedulers:         %d" % number_of_active_schedulers)
-    print("active computes:           %d" % number_of_active_computes)
-    print("")
-    print("total requests:            %d" % count_total_requests)
-    print("successful requests:       %d" % count_successful_requests)
-    print("nvh requests:              %d" % count_nvh_requests)
-    print("rtf requests:              %d" % count_retry_failed_requests)
-    print("api failed requests:       %d" % count_api_failed_requests)
-    print("incomplete requests:       %d" % count_incomplete_requests)
-    print("error requests:            %d" % count_error_requests)
-    print("")
-    print("total valid queries:       %d" % count_total_queries)
-    print("direct successful queries: %d" % count_direct_successful_queries)
-    print("direct nvh queries:        %d" % count_direct_nvh_queries)
-    print("direct retried queries:    %d" % count_direct_retried_queries)
-    print("retry successful queries:  %d" % count_retried_successful_queries)
-    print("retry nvh queries:         %d" % count_retried_nvh_queries)
-    print("retry retried queires:     %d" % count_retried_retried_queries)
-    print("")
-    print("wall clock total(s):       %7.5f" % time_wall_clock_total)
-    print("wall clock api:            %7.5f" % time_wall_clock_api)
-    print("wall clock conductor:      %7.5f" % time_wall_clock_conductor)
-    print("wall clock scheduler:      %7.5f" % time_wall_clock_scheduler)
-    print("wall clock compute:        %7.5f" % time_wall_clock_compute)
-    print("wall clock query:          %7.5f" % time_wall_clock_query)
-    print("")
-    print("time inapi avg:            %7.5f" % time_query_inapi_avg)
-    print("time a-con avg:            %7.5f" % time_query_a_con_avg)
-    print("time cond1 avg:            %7.5f" % time_query_cond1_avg)
-    print("time c-sch avg:            %7.5f" % time_query_c_sch_avg)
-    print("time sched avg:            %7.5f" % time_query_sched_avg)
-    print("time s-con avg:            %7.5f" % time_query_s_con_avg)
-    print("time cond2 avg:            %7.5f" % time_query_cond2_avg)
-    print("time c-com avg:            %7.5f" % time_query_c_com_avg)
-    print("time compu avg:            %7.5f" % time_query_compu_avg)
-    print("")
-    print("time filter avg:           %7.5f" % time_query_filter_avg)
-    print("time cache refresh avg:    %7.5f" % time_query_cache_avg)
-    print("time gap avg:              %7.5f" % time_query_gap_avg)
-    print("")
-    print("percent api part:          %7.5f" % percent_inapi)
-    print("percent msg part:          %7.5f" % percent_msg)
-    print("percent cond part:         %7.5f" % percent_cond)
-    print("percent sch part:          %7.5f" % percent_sched)
-    print("percent compute part:      %7.5f" % percent_compu)
-    print("percent filter part:       %7.5f" % percent_sched_filter)
-    print("percent cache-refresh part:%7.5f" % percent_sched_cache)
-    print("percent gap part:          %7.5f" % percent_sched_gap)
-    print("")
-    print("request per sec:           %7.5f" % request_per_sec)
-    print("query per sec:             %7.5f" % query_per_sec)
-    print("success per sec:           %7.5f" % success_per_sec)
-    print("")
-    print("percent query retry:       %7.5f" % query_retry_percent)
-    print("percent request api fail:  %7.5f" % request_failure_percent)
+    if args.outfile is None:
+        print("")
+        print(" >> FINAL REPORT:")
+        print("active schedulers:         %d" % number_of_active_schedulers)
+        print("active computes:           %d" % number_of_active_computes)
+        print("")
+        print("total requests:            %d" % count_total_requests)
+        print("successful requests:       %d" % count_successful_requests)
+        print("nvh requests:              %d" % count_nvh_requests)
+        print("rtf requests:              %d" % count_retry_failed_requests)
+        print("api failed requests:       %d" % count_api_failed_requests)
+        print("incomplete requests:       %d" % count_incomplete_requests)
+        print("error requests:            %d" % count_error_requests)
+        print("")
+        print("total valid queries:       %d" % count_total_queries)
+        print("direct successful queries: %d" % count_direct_successful_queries)
+        print("direct nvh queries:        %d" % count_direct_nvh_queries)
+        print("direct retried queries:    %d" % count_direct_retried_queries)
+        print("retry successful queries:  %d" % count_retried_successful_queries)
+        print("retry nvh queries:         %d" % count_retried_nvh_queries)
+        print("retry retried queires:     %d" % count_retried_retried_queries)
+        print("")
+        print("wall clock total(s):       %7.5f" % time_wall_clock_total)
+        print("wall clock api:            %7.5f" % time_wall_clock_api)
+        print("wall clock conductor:      %7.5f" % time_wall_clock_conductor)
+        print("wall clock scheduler:      %7.5f" % time_wall_clock_scheduler)
+        print("wall clock compute:        %7.5f" % time_wall_clock_compute)
+        print("wall clock query:          %7.5f" % time_wall_clock_query)
+        print("")
+        print("time inapi avg:            %7.5f" % time_query_inapi_avg)
+        print("time a-con avg:            %7.5f" % time_query_a_con_avg)
+        print("time cond1 avg:            %7.5f" % time_query_cond1_avg)
+        print("time c-sch avg:            %7.5f" % time_query_c_sch_avg)
+        print("time sched avg:            %7.5f" % time_query_sched_avg)
+        print("time s-con avg:            %7.5f" % time_query_s_con_avg)
+        print("time cond2 avg:            %7.5f" % time_query_cond2_avg)
+        print("time c-com avg:            %7.5f" % time_query_c_com_avg)
+        print("time compu avg:            %7.5f" % time_query_compu_avg)
+        print("")
+        print("time filter avg:           %7.5f" % time_query_filter_avg)
+        print("time cache refresh avg:    %7.5f" % time_query_cache_avg)
+        print("time gap avg:              %7.5f" % time_query_gap_avg)
+        print("")
+        print("percent api part:          %7.5f" % percent_inapi)
+        print("percent msg part:          %7.5f" % percent_msg)
+        print("percent cond part:         %7.5f" % percent_cond)
+        print("percent sch part:          %7.5f" % percent_sched)
+        print("percent compute part:      %7.5f" % percent_compu)
+        print("percent filter part:       %7.5f" % percent_sched_filter)
+        print("percent cache-refresh part:%7.5f" % percent_sched_cache)
+        print("percent gap part:          %7.5f" % percent_sched_gap)
+        print("")
+        print("request per sec:           %7.5f" % request_per_sec)
+        print("query per sec:             %7.5f" % query_per_sec)
+        print("success per sec:           %7.5f" % success_per_sec)
+        print("")
+        print("percent query retry:       %7.5f" % query_retry_percent)
+        print("percent request api fail:  %7.5f" % request_failure_percent)
+    else:
+        outfile = open(args.outfile, 'a+')
+        if args.csv_print_header:
+            header_fields = [
+                "Name",
+                "Active schedulers",
+                "Active computes",
+                "Total requests",
+                "Successful requests",
+                "Nvh requests",
+                "Rtf requests",
+                "Api failed requests",
+                "Incomplete requests",
+                "Error requests",
+                "Total valid queries",
+                "Direct successful queries",
+                "Direct nvh queries",
+                "Direct retried queries",
+                "Retry successful queries",
+                "Retry nvh queries",
+                "Retry retried queires",
+                "Clock total(s)",
+                "Clock api",
+                "Clock conductor",
+                "Clock scheduler",
+                "Clock compute",
+                "Clock query",
+                "Time inapi avg",
+                "Time a-con avg",
+                "Time cond1 avg",
+                "Time c-sch avg",
+                "Time sched avg",
+                "Time s-con avg",
+                "Time cond2 avg",
+                "Time c-com avg",
+                "Time compu avg",
+                "Time filter avg",
+                "Time cache refresh avg",
+                "Time gap avg",
+                "Percent api part",
+                "Percent msg part",
+                "Percent cond part",
+                "Percent sch part",
+                "Percent compute part",
+                "Percent filter part",
+                "Percent cache-refresh part",
+                "Percent gap part",
+                "Request per sec",
+                "Query per sec",
+                "Success per sec",
+                "Percent query retry",
+                "Percent request api fail",
+            ]
+            outfile.write(','.join(header_fields) + '\n')
+        row_fields = [
+            args.folder,
+            number_of_active_schedulers,
+            number_of_active_computes,
+            count_total_requests,
+            count_successful_requests,
+            count_nvh_requests,
+            count_retry_failed_requests,
+            count_api_failed_requests,
+            count_incomplete_requests,
+            count_error_requests,
+            count_total_queries,
+            count_direct_successful_queries,
+            count_direct_nvh_queries,
+            count_direct_retried_queries,
+            count_retried_successful_queries,
+            count_retried_nvh_queries,
+            count_retried_retried_queries,
+            time_wall_clock_total,
+            time_wall_clock_api,
+            time_wall_clock_conductor,
+            time_wall_clock_scheduler,
+            time_wall_clock_compute,
+            time_wall_clock_query,
+            time_query_inapi_avg,
+            time_query_a_con_avg,
+            time_query_cond1_avg,
+            time_query_c_sch_avg,
+            time_query_sched_avg,
+            time_query_s_con_avg,
+            time_query_cond2_avg,
+            time_query_c_com_avg,
+            time_query_compu_avg,
+            time_query_filter_avg,
+            time_query_cache_avg,
+            time_query_gap_avg,
+            percent_inapi,
+            percent_msg,
+            percent_cond,
+            percent_sched,
+            percent_compu,
+            percent_sched_filter,
+            percent_sched_cache,
+            percent_sched_gap,
+            request_per_sec,
+            query_per_sec,
+            success_per_sec,
+            query_retry_percent,
+            request_failure_percent,
+        ]
+        outfile.write(','.join(str(f) for f in row_fields) + '\n')
+        outfile.flush()
+        outfile.close()
 
-    """
-    draw.Diagram(sm_parser.intervals_direct_inapi).draw("inapi")
-    draw.Diagram(sm_parser.intervals_direct_a_con).draw("a-con")
-    draw.Diagram(sm_parser.intervals_direct_sched).draw("sched")
-    draw.Diagram(sm_parser.intervals_direct_compute).draw("compu")
-    draw.Diagram(sm_parser.intervals_api_fail).draw("fail")
-    draw.Diagram(sm_parser.intervals_direct_cond2).draw("cond2")
-    draw.Diagram(sm_parser.intervals_direct_cache_refresh).draw("cache")
-    draw.DiagramStack([sm_parser.intervals_direct_inapi,
-                       sm_parser.intervals_direct_a_con,
-                       sm_parser.intervals_direct_cond1,
-                       sm_parser.intervals_direct_c_sch,
-                       sm_parser.intervals_direct_sched,
-                       sm_parser.intervals_direct_s_con,
-                       sm_parser.intervals_direct_cond2,
-                       sm_parser.intervals_direct_c_com,
-                       sm_parser.intervals_direct_compute,
-                       sm_parser.intervals_api_fail,
-                       sm_parser.intervals_retry,
-                       ]).draw("stack")
-    draw.show()
-    """
+        """
+        draw.Diagram(sm_parser.intervals_direct_inapi).draw("inapi")
+        draw.Diagram(sm_parser.intervals_direct_a_con).draw("a-con")
+        draw.Diagram(sm_parser.intervals_direct_sched).draw("sched")
+        draw.Diagram(sm_parser.intervals_direct_compute).draw("compu")
+        draw.Diagram(sm_parser.intervals_api_fail).draw("fail")
+        draw.Diagram(sm_parser.intervals_direct_cond2).draw("cond2")
+        draw.Diagram(sm_parser.intervals_direct_cache_refresh).draw("cache")
+        """
+        draw.DiagramStack([sm_parser.intervals_direct_inapi,
+                           sm_parser.intervals_direct_a_con,
+                           sm_parser.intervals_direct_cond1,
+                           sm_parser.intervals_direct_c_sch,
+                           sm_parser.intervals_direct_sched,
+                           sm_parser.intervals_direct_s_con,
+                           sm_parser.intervals_direct_cond2,
+                           sm_parser.intervals_direct_c_com,
+                           sm_parser.intervals_direct_compute,
+                           sm_parser.intervals_api_fail,
+                           sm_parser.intervals_retry,
+                           ]).draw("stack-"+args.folder)
+        draw.show()
 
 
 def main():
@@ -1208,6 +1316,8 @@ def main():
     parser.add_argument('--brief',
                         action="store_true",
                         help="Supress verbose error report.")
+    parser.add_argument('--csv-print-header', action="store_true",
+                        help="Write a row into the CSV file for the headers.")
     parser.add_argument('--outfile',
                         help="The output file of report.")
     parser.add_argument('--offset',
@@ -1309,7 +1419,8 @@ def main():
     if args.brief:
         return
 
-    generate_report(group_by_state_machine,
+    generate_report(args,
+                    group_by_state_machine,
                     scheduler_services,
                     compute_services)
 
