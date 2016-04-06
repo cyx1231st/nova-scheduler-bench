@@ -3,3 +3,5 @@
 *.log
 results*
 .requests
+*.swp
+*.swo
