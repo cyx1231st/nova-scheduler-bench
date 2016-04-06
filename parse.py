@@ -9,6 +9,8 @@ from os import path
 import draw
 
 SECONDS_OFFSET=False
+C_SCHEDULER=True
+
 
 class LogLine(object):
     def __init__(self, line, service, host, filename, offset):
@@ -262,6 +264,8 @@ class StateMachine(object):
         elif state == 7:
             if _assert("scheduler", None, "start_db"):
                 return _next(8)
+            elif _assert("scheduler", None, "finish scheduling"):
+                return _next(10)
         elif state == 8:
             if _assert("scheduler", None, "finish_db"):
                 return _next(9)
@@ -651,32 +655,37 @@ class StateMachinesParser(object):
                           0, "received", "api",
                           1, "failed:", "api")
 
+        c_offset=0
+        if C_SCHEDULER:
+            c_offset=-2
+
         for query in self.direct_successful_queries:
             _set_interval(self._cond_complete_intervals, query,
                           2, "received", "conductor",
-                          12, "sent", "conductor")
+                          12+c_offset, "sent", "conductor")
             _set_interval(self._cond1_intervals, query,
                           2, "received", "conductor",
                           4, "sent scheduler", "conductor")
             _set_interval(self._sched_intervals, query,
                           5, "received", "scheduler",
-                          10, "selected", "scheduler")
+                          10+c_offset, "selected", "scheduler")
             _set_interval(self._cond2_intervals, query,
-                          11, "decided", "conductor",
-                          12, "sent", "conductor")
+                          11+c_offset, "decided", "conductor",
+                          12+c_offset, "sent", "conductor")
             _set_interval(self._compu_intervals, query,
-                          13, "received", "compute",
-                          14, "success", "compute")
+                          13+c_offset, "received", "compute",
+                          14+c_offset, "success", "compute")
 
-            _set_interval(self._direct_schedb_intervals, query,
+            if not C_SCHEDULER:
+                _set_interval(self._direct_schedb_intervals, query,
                           7, "start_db", "scheduler",
                           8, "finish_db", "scheduler")
-            _set_interval(self._direct_filter_intervals, query,
-                          6, "start scheduling", "scheduler",
-                          9, "finish scheduling", "scheduler")
-            _set_interval(self._direct_gap_intervals, query,
+                _set_interval(self._direct_gap_intervals, query,
                           8, "finish_db", "scheduler",
                           14, "success", "compute")
+            _set_interval(self._direct_filter_intervals, query,
+                          6, "start scheduling", "scheduler",
+                          9+c_offset, "finish scheduling", "scheduler")
 
             _set_interval(self._direct_inapi_intervals, query,
                           0, "received", "api",
@@ -692,19 +701,19 @@ class StateMachinesParser(object):
                           5, "received", "scheduler")
             _set_interval(self._direct_sched_intervals, query,
                           5, "received", "scheduler",
-                          10, "selected", "scheduler")
+                          10+c_offset, "selected", "scheduler")
             _set_interval(self._direct_s_con_intervals, query,
-                          10, "selected", "scheduler",
-                          11, "decided", "conductor")
+                          10+c_offset, "selected", "scheduler",
+                          11+c_offset, "decided", "conductor")
             _set_interval(self._direct_cond2_intervals, query,
-                          11, "decided", "conductor",
-                          12, "sent", "conductor")
+                          11+c_offset, "decided", "conductor",
+                          12+c_offset, "sent", "conductor")
             _set_interval(self._direct_c_com_intervals, query,
-                          12, "sent", "conductor",
-                          13, "received", "compute")
+                          12+c_offset, "sent", "conductor",
+                          13+c_offset, "received", "compute")
             _set_interval(self._direct_compu_intervals, query,
-                          13, "received", "compute",
-                          14, "success", "compute")
+                          13+c_offset, "received", "compute",
+                          14+c_offset, "success", "compute")
 
         for query in self.direct_nvh_queries:
             _set_interval(self._cond1_intervals, query,
@@ -712,17 +721,18 @@ class StateMachinesParser(object):
                           4, "sent scheduler", "conductor")
             _set_interval(self._sched_intervals, query,
                           5, "received", "scheduler",
-                          10, "failed: novalidhost", "scheduler")
+                          10+c_offset, "failed: novalidhost", "scheduler")
             _set_interval(self._cond_complete_intervals, query,
                           2, "received", "conductor",
-                          11, "failed:", "conductor")
+                          11+c_offset, "failed:", "conductor")
 
-            _set_interval(self._direct_schedb_intervals, query,
+            if not C_SCHEDULER:
+                _set_interval(self._direct_schedb_intervals, query,
                           7, "start_db", "scheduler",
                           8, "finish_db", "scheduler")
             _set_interval(self._direct_filter_intervals, query,
                           6, "start scheduling", "scheduler",
-                          9, "finish scheduling", "scheduler")
+                          9+c_offset, "finish scheduling", "scheduler")
 
             _set_interval(self._direct_inapi_intervals, query,
                           0, "received", "api",
@@ -738,37 +748,38 @@ class StateMachinesParser(object):
                           5, "received", "scheduler")
             _set_interval(self._direct_sched_intervals, query,
                           5, "received", "scheduler",
-                          10, "failed: novalidhost", "scheduler")
+                          10+c_offset, "failed: novalidhost", "scheduler")
             _set_interval(self._direct_s_con_intervals, query,
-                          10, "failed: novalidhost", "scheduler",
-                          11, "failed:", "conductor")
+                          10+c_offset, "failed: novalidhost", "scheduler",
+                          11+c_offset, "failed:", "conductor")
 
         for query in self.direct_rtf_queries:
             _set_interval(self._cond_complete_intervals, query,
                           2, "received", "conductor",
-                          12, "sent", "conductor")
+                          12+c_offset, "sent", "conductor")
             _set_interval(self._cond1_intervals, query,
                           2, "received", "conductor",
                           4, "sent scheduler", "conductor")
             _set_interval(self._sched_intervals, query,
                           5, "received", "scheduler",
-                          10, "selected", "scheduler")
+                          10+c_offset, "selected", "scheduler")
             _set_interval(self._cond2_intervals, query,
-                          11, "decided", "conductor",
-                          12, "sent", "conductor")
+                          11+c_offset, "decided", "conductor",
+                          12+c_offset, "sent", "conductor")
             _set_interval(self._compu_intervals, query,
-                          13, "received", "compute",
-                          14, "fail: retry", "compute")
+                          13+c_offset, "received", "compute",
+                          14+c_offset, "fail: retry", "compute")
 
-            _set_interval(self._direct_schedb_intervals, query,
+            if not C_SCHEDULER:
+                _set_interval(self._direct_schedb_intervals, query,
                           7, "start_db", "scheduler",
                           8, "finish_db", "scheduler")
-            _set_interval(self._direct_filter_intervals, query,
-                          6, "start scheduling", "scheduler",
-                          9, "finish scheduling", "scheduler")
-            _set_interval(self._direct_gap_intervals, query,
+                _set_interval(self._direct_gap_intervals, query,
                           8, "finish_db", "scheduler",
                           14, "fail: retry", "compute")
+            _set_interval(self._direct_filter_intervals, query,
+                          6, "start scheduling", "scheduler",
+                          9+c_offset, "finish scheduling", "scheduler")
 
             _set_interval(self._direct_inapi_intervals, query,
                           0, "received", "api",
@@ -784,40 +795,40 @@ class StateMachinesParser(object):
                           5, "received", "scheduler")
             _set_interval(self._direct_sched_intervals, query,
                           5, "received", "scheduler",
-                          10, "selected", "scheduler")
+                          10+c_offset, "selected", "scheduler")
             _set_interval(self._direct_s_con_intervals, query,
-                          10, "selected", "scheduler",
-                          11, "decided", "conductor")
+                          10+c_offset, "selected", "scheduler",
+                          11+c_offset, "decided", "conductor")
             _set_interval(self._direct_cond2_intervals, query,
-                          11, "decided", "conductor",
-                          12, "sent", "conductor")
+                          11+c_offset, "decided", "conductor",
+                          12+c_offset, "sent", "conductor")
             _set_interval(self._direct_c_com_intervals, query,
-                          12, "sent", "conductor",
-                          13, "received", "compute")
+                          12+c_offset, "sent", "conductor",
+                          13+c_offset, "received", "compute")
             _set_interval(self._direct_compu_intervals, query,
-                          13, "received", "compute",
-                          14, "fail: retry", "compute")
+                          13+c_offset, "received", "compute",
+                          14+c_offset, "fail: retry", "compute")
 
         for query in self.retry_successful_queries:
             _set_interval(self._cond_complete_intervals, query,
                           0, "received", "conductor",
-                          10, "sent", "conductor")
+                          10+c_offset, "sent", "conductor")
             _set_interval(self._cond1_intervals, query,
                           0, "received", "conductor",
                           2, "sent scheduler", "conductor")
             _set_interval(self._cond2_intervals, query,
-                          9, "decided", "conductor",
-                          10, "sent", "conductor")
+                          9+c_offset, "decided", "conductor",
+                          10+c_offset, "sent", "conductor")
             _set_interval(self._sched_intervals, query,
                           3, "received", "scheduler",
-                          8, "selected", "scheduler")
+                          8+c_offset, "selected", "scheduler")
             _set_interval(self._compu_intervals, query,
-                          11, "received", "compute",
-                          12, "success", "compute")
+                          11+c_offset, "received", "compute",
+                          12+c_offset, "success", "compute")
 
             _set_interval(self._retry_intervals, query,
                           0, "received", "conductor",
-                          12, "success", "compute")
+                          12+c_offset, "success", "compute")
             """
             _set_interval(self._schedb_intervals, query,
                           5, "start_db", "scheduler",
@@ -845,14 +856,14 @@ class StateMachinesParser(object):
                           2, "sent scheduler", "conductor")
             _set_interval(self._cond_complete_intervals, query,
                           0, "received", "conductor",
-                          9, "failed:", "conductor")
+                          9+c_offset, "failed:", "conductor")
             _set_interval(self._sched_intervals, query,
                           3, "received", "scheduler",
-                          8, "failed: novalidhost", "scheduler")
+                          8+c_offset, "failed: novalidhost", "scheduler")
 
             _set_interval(self._retry_intervals, query,
                           0, "received", "conductor",
-                          9, "failed:", "conductor")
+                          9+c_offset, "failed:", "conductor")
             """
             _set_interval(self._schedb_intervals, query,
                           5, "start_db", "scheduler",
@@ -874,20 +885,20 @@ class StateMachinesParser(object):
                           2, "sent scheduler", "conductor")
             _set_interval(self._sched_intervals, query,
                           3, "received", "scheduler",
-                          8, "selected", "scheduler")
+                          8+c_offset, "selected", "scheduler")
             _set_interval(self._cond2_intervals, query,
-                          9, "decided", "conductor",
-                          10, "sent", "conductor")
+                          9+c_offset, "decided", "conductor",
+                          10+c_offset, "sent", "conductor")
             _set_interval(self._compu_intervals, query,
-                          11, "received", "compute",
-                          12, "fail: retry", "compute")
+                          11+c_offset, "received", "compute",
+                          12+c_offset, "fail: retry", "compute")
             _set_interval(self._cond_complete_intervals, query,
                           0, "received", "conductor",
-                          10, "sent", "conductor")
+                          10+c_offset, "sent", "conductor")
 
             _set_interval(self._retry_intervals, query,
                           0, "received", "conductor",
-                          12, "fail: retry", "compute")
+                          12+c_offset, "fail: retry", "compute")
             """
             _set_interval(self._schedb_intervals, query,
                           5, "start_db", "scheduler",
@@ -981,6 +992,8 @@ class Intervals(object):
         return total
 
     def average(self):
+        if not self.intervals:
+            return 0
         return (sum([interval[2] for interval in self.intervals])
                 / len(self.intervals))
 
