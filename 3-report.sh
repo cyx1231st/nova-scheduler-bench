@@ -3,6 +3,12 @@ TOP_DIR=$(cd $(dirname "$0") && pwd)
 pushd $TOP_DIR > /dev/null
 
 result_folder="results"
-python parse.py $1 openstack-bench/$result_folder
+
+mkdir $result_folder
+rm $result_folder/*
+cp -r openstack-bench/$result_folder/* ./$result_folder
+python parse.py $result_folder
+
+echo "Done!"
 
 popd > /dev/null

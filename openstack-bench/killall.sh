@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 sudo killall nova-scheduler
 sudo killall nova-api
 sudo killall nova-conductor

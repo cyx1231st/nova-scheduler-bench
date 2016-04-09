@@ -93,6 +93,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
         self.conf("reserved_host_disk_mb", 0)
         self.conf("reserved_host_memory_mb", 0)
         self.conf("scheduler_max_attempts", 5)
+        # self.conf("scheduler_driver", "caching_scheduler")
 
     def _inject_logs(self):
         # nova api part

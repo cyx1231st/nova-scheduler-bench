@@ -6,10 +6,8 @@ from itertools import chain
 import os
 from os import path
 
-import draw
-
 SECONDS_OFFSET=False
-C_SCHEDULER=True
+C_SCHEDULER=False
 
 
 class LogLine(object):
@@ -1283,29 +1281,6 @@ def generate_report(args, state_machines, schedulers, computes):
         outfile.write(','.join(str(f) for f in row_fields) + '\n')
         outfile.flush()
         outfile.close()
-
-        """
-        draw.Diagram(sm_parser.intervals_direct_inapi).draw("inapi")
-        draw.Diagram(sm_parser.intervals_direct_a_con).draw("a-con")
-        draw.Diagram(sm_parser.intervals_direct_sched).draw("sched")
-        draw.Diagram(sm_parser.intervals_direct_compute).draw("compu")
-        draw.Diagram(sm_parser.intervals_api_fail).draw("fail")
-        draw.Diagram(sm_parser.intervals_direct_cond2).draw("cond2")
-        draw.Diagram(sm_parser.intervals_direct_cache_refresh).draw("cache")
-        """
-        draw.DiagramStack([sm_parser.intervals_direct_inapi,
-                           sm_parser.intervals_direct_a_con,
-                           sm_parser.intervals_direct_cond1,
-                           sm_parser.intervals_direct_c_sch,
-                           sm_parser.intervals_direct_sched,
-                           sm_parser.intervals_direct_s_con,
-                           sm_parser.intervals_direct_cond2,
-                           sm_parser.intervals_direct_c_com,
-                           sm_parser.intervals_direct_compute,
-                           sm_parser.intervals_api_fail,
-                           sm_parser.intervals_retry,
-                           ]).draw("stack-"+args.folder)
-        draw.show()
 
 
 def main():
