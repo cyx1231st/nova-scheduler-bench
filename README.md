@@ -35,15 +35,15 @@ this environment by successfully spawning a VM and then delete it.
 
 The simplest way to get a suitable OpenStack environment is to follow the
 DevStack All-In-One Single Machine installation:
-'''
+```
 http://docs.openstack.org/developer/devstack/guides/single-machine.html
-''' 
+```
 
 Second, switch to stack user and clone this repo to any folder you want.
-'''
+```
 $ git clone git@github.com:cyx1231st/nova-scheduler-bench.git
 $ cd nova-scheduler-bench
-'''
+```
 
 The benchmark tool is ready for use now!
 
@@ -62,14 +62,14 @@ creating instances.
 Kill all the services and launch the monkey-patched services instead. Use
 parameters to define the number of schedulers, the number of compute nodes and
 the max number of requests for benchmarking.
-"""
+```
 setup.sh <number of schedulers> <number of nodes> <number of max requests>
-"""
+```
 
 Then make sure the services are up after running this command.
-"""
+```
 $nova service-list
-"""
+```
 
 ### 2-create.sh
 
@@ -78,7 +78,7 @@ runtime logs are collected in folder "./openstack-bench/results/". Make sure
 all the requests are completely handled by nova. Here is an example
 benchmarking run using 2 schedulers, 5 compute nodes and sending 50 concurrent
 requests.
-"""
+```
 $ ./2-create.sh
 python parse.py ./openstack-bench/results --brief
 
@@ -87,14 +87,14 @@ Active schedulers: 2
 Active computes: 5
 Total requests count: 50
   Success requests: 50
-"""
+```
 
 ### 3-report.sh
 
 See the complete report by parsing the logs in "./openstack-bench/results/" and
 move them to "./results/".
 For example:
-"""
+```
 $ ./3-report.sh
 successful requests:       48
 nvh requests:              2
@@ -148,15 +148,15 @@ success per sec:           3.91294
 percent query retry:       18.75000
 percent request api fail:  0.00000
 Done!
-"""
+```
 
 ### 4-delete.sh
 
 Remove all instances created in the OpenStack.
 Make sure all instances are deleted by executing:
-"""
+```
 $ nova list
-"""
+```
 
 ### 5-reset.sh
 
