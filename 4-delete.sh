@@ -33,8 +33,8 @@ OS_TOKEN=`curl -i \
   http://localhost:5000/v3/auth/tokens | grep X-Subject-Token: | sed -e "s/X-Subject-Token: //"`
 echo "Got token $OS_TOKEN"
 
-TENANT=`keystone tenant-list | grep " admin" | sed -e "s/ |       admin        |   True  |//" | sed -e "s/| //"` > /dev/null
-echo "Got tenant id $TENANT"
+TENANT=`openstack project list | grep " admin" | sed -e "s/ | admin              |//" | sed -e "s/| //"` > /dev/null
+echo "Got tenant id: $TENANT"
 
 counter=0
 for id in `nova list | awk '$2 && $2 != "ID" {print $2}'`

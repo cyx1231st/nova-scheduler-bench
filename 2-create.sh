@@ -46,7 +46,7 @@ OS_TOKEN=`curl -i \
   http://localhost:5000/v3/auth/tokens | grep X-Subject-Token: | sed -e "s/X-Subject-Token: //"`
 echo "Got token $OS_TOKEN"
 
-TENANT=`keystone tenant-list | grep " admin" | sed -e "s/ |       admin        |   True  |//" | sed -e "s/| //"` > /dev/null
+TENANT=`openstack project list | grep " admin" | sed -e "s/ | admin              |//" | sed -e "s/| //"` > /dev/null
 echo "Got tenant id: $TENANT"
 
 IMAGE=`nova image-list | grep "uec " | sed -e "s/ | cirros-0.3.4-x86_64-uec         | ACTIVE |        |//" | sed -e "s/| //"`
