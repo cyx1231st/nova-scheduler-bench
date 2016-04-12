@@ -349,8 +349,7 @@ class StateMachine(object):
                 
         def _error(i):
             self.status = self.ERROR
-            self.error_logs.extend(queue)
-            self.error_logs.extend(self.logs[i+1:])
+            self.error_logs.extend(self.logs[i:])
 
         for i in range(0, len(self.logs)):
             if not self._parse_line(self.logs[i], queue, i, len(self.logs)-1):
@@ -374,10 +373,12 @@ class StateMachine(object):
                 elif self.state == 23:
                     if self.retries == 1:
                         self.cqs_state = "compute failed"
-                        return _stop(i, self.cqs)
+                        # return _stop(i, self.cqs)
+                        return _error(i)
                     else:
                         self.rqs_state = "compute failed"
-                        return _stop(i, self.rqs_final)
+                        # return _stop(i, self.rqs_final)
+                        return _error(i)
                 elif self.state == 24:
                     if self.retries == 1:
                         self.cqs_state = "success"

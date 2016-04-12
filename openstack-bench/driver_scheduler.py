@@ -19,6 +19,9 @@ from nova.virt import fake
 import bench
 
 
+NEW_SCHEDULER = False
+
+
 class ComputeResourceView(object):
     def __init__(self, hostname, vcpus=4, memory_mb=2048, local_gb=1024):
         self.hostname = hostname
@@ -64,7 +67,9 @@ def debug(*args, **kwargs):
 
 
 class BenchDriverScheduler(bench.BenchDriverBase):
-    def __init__(self, meta):
+    def __init__(self, meta, host_manager=None):
+        # self.host_manager = "shared_host_manager"
+        self.host_manager = "host_manager"
         super(BenchDriverScheduler, self).__init__(meta)
 
     def _stubout_nova(self):
@@ -93,6 +98,8 @@ class BenchDriverScheduler(bench.BenchDriverBase):
         self.conf("reserved_host_memory_mb", 0)
         self.conf("scheduler_max_attempts", 5)
         # self.conf("scheduler_driver", "caching_scheduler")
+        if self.host_manager:
+            self.conf("scheduler_host_manager", self.host_manager)
 
     def _inject_logs(self):
         # nova api part
@@ -131,7 +138,15 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                     if 'retry' not in args[0] else
                     self.warn("%s attempts %s"
                               % (args[1], args[0]['retry']['num_attempts'])))
+
         _from_spec = lambda args: args[2].instance_uuid
+
+        def _get_host(kwargs):
+            if NEW_SCHEDULER:
+                return kwargs['ret_val'][0][0]['host']
+            else:
+                return kwargs['ret_val'][0]['host']
+
         self.patch_aop(
                 "nova.scheduler.rpcapi.SchedulerAPI.select_destinations",
                 before=lambda *args, **kwargs:
@@ -145,7 +160,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                     if kwargs['exc_val'] else
                     self.warn("%s decided %s"
                               % (_from_spec(args),
-                                 kwargs['ret_val'][0]['host'])))
+                                 _get_host(kwargs))))
         self.patch_aop(
                 "nova.compute.rpcapi.ComputeAPI.build_and_run_instance",
                 before=lambda *args, **kwargs:
@@ -165,7 +180,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                     if kwargs['exc_val'] else
                     self.warn("%s selected %s"
                               % (_from_spec_kw(kwargs),
-                                 kwargs['ret_val'][0]['host'])))
+                                 _get_host(kwargs))))
         self.patch_aop(
                 "nova.scheduler.filter_scheduler.FilterScheduler._schedule",
                 before=lambda *args, **kwargs:
@@ -190,18 +205,14 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                 after=lambda *args, **kwargs:
                     self.warn("%s finished: %s"
                               % (args[2].display_name, kwargs['ret_val'])))
-        """
         self.patch_aop(
                 "nova.compute.manager.ComputeManager._build_and_run_instance",
-                after=debug)
-                lambda *args, **kwargs:
-                    self.warn("%s fail: %s"
-                        % (args[2].display_name, kwargs['exc_val']))
-                    if kwargs['exc_val'] and
-                        not isinstance(kwargs['exc_val'],
-                                       exception.RescheduledException) else
-                    lambda *args, **kwargs:
-                    self.warn("%s fail: retry" % args[2].display_name))
+                after=lambda *args, **kwargs:
+                    self.warn("%s fail: retry" % args[2].display_name)
+                    if isinstance(kwargs['exc_val'], exception.RescheduledException) else
+                    self.warn("%s fail: %s" % (args[2].display_name, kwargs['exc_val']))
+                    if kwargs['exc_val'] is not None else
+                    self.warn("%s success" % args[2].display_name))
         """
         self.patch_aop(
                 "nova.compute.claims.Claim._claim_test",
@@ -211,6 +222,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                     if kwargs['exc_val'] is None else
                     self.warn("%s fail: retry"
                         % args[0].instance.display_name))
+        """
 
 
 def get_driver(meta):
