@@ -52,6 +52,11 @@ do
     sleep 1
 done
 
+for file in `ls ./openstack-bench/results`; do
+    > "./openstack-bench/results/$file"
+done
+echo "Cleared the logs in ./openstack-bench/results/"
+
 watch -n 5 "nova list"
 
 popd > /dev/null
