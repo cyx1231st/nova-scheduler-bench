@@ -87,10 +87,10 @@ def queue_requests(args):
         for req in requests:
             outfile.write(str(req) + " ")
         outfile.write(")")
-    LOG.info("Wrote instance requests to output file %s." %
+    print("Wrote instance requests to output file %s." %
              args.out_file)
 
-    LOG.info("Placed %d instance requests into queue." % num_requests)
+    print("Placed %d instance requests into queue." % num_requests)
     
 
 if __name__ == '__main__':
