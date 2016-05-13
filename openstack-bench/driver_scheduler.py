@@ -98,6 +98,17 @@ class BenchDriverScheduler(bench.BenchDriverBase):
         self.conf("reserved_host_memory_mb", 0)
         self.conf("scheduler_max_attempts", 5)
         # self.conf("scheduler_driver", "caching_scheduler")
+        self.conf("scheduler_default_filters",
+                  ["RetryFilter",
+                   "AvailabilityZoneFilter",
+                   "RamFilter",
+                   "DiskFilter",
+                   "CoreFilter",
+                   "ComputeFilter",
+                   "ComputeCapabilitiesFilter",
+                   "ImagePropertiesFilter",
+                   "ServerGroupAntiAffinityFilter",
+                   "ServerGroupAffinityFilter"])
         if self.host_manager:
             self.conf("scheduler_host_manager", self.host_manager)
 
