@@ -36,6 +36,18 @@ def main():
     parser.add_argument('--result-folder',
                         default=".",
                         help="If set, the logs will be in that folder.")
+    parser.add_argument('--view',
+                        default="A",
+                        help="The resource type loaded, A is normal, "
+                        "B cannot hold any vm of flavor 154, "
+                        "and C can only hold 1 vm of flavor 154.")
+    parser.add_argument('--new', action="store_true",
+                        help="The new code has a different inject point.")
+    parser.add_argument('--scheduler-type',
+                        default="shared",
+                        help="filter: filter scheduler; "
+                        "caching: caching scheduler; "
+                        "shared: shared-state scheduler.")
     parser.add_argument("service",
                         help="Launched nova service type.")
     args = parser.parse_args()

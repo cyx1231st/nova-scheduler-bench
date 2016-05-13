@@ -43,6 +43,9 @@ class BenchmarkMeta(object):
         self.service = args.service
         self.log_prefix = "BENCH-" + self.service + "-" + self.host + ": "
         self.folder = args.result_folder + "/"
+        self.v_type = args.view
+        self.scheduler_type = args.scheduler_type
+        self.new_inject = args.new
         """
         driver_name = args.driver
         try:

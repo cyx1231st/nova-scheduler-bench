@@ -22,12 +22,45 @@ import bench
 NEW_SCHEDULER = False
 
 
+def get_view(v_type):
+    if v_type == "A":
+        return ComputeResourceView(None,
+                                   vcpus=8,
+                                   memory_mb=64*1024,  # 64G
+                                   local_gb=25*1024,   # 25TB
+                                   r_ratio=1.5,
+                                   c_ratio=16,
+                                   d_ratio=1.5)
+    elif v_type == "B":  # cannot place flavor 154
+        return ComputeResourceView(None,
+                                   vcpus=3,
+                                   memory_mb=4*1024,
+                                   local_gb=4*1024)
+    elif v_type == "C":  # can only fit 1 host for flavor 154
+        return ComputeResourceView(None,
+                                   vcpu=6,
+                                   memory_mb=12*1024,
+                                   local_gb=4*1024)
+    else:
+        raise RuntimeError("Unsupported view option: %s" % v_type)
+
+
 class ComputeResourceView(object):
-    def __init__(self, hostname, vcpus=4, memory_mb=2048, local_gb=1024):
+    def __init__(self,
+                 hostname,
+                 vcpus=4,
+                 memory_mb=2048,
+                 local_gb=1024,
+                 r_ratio=1.0,
+                 c_ratio=1.0,
+                 d_ratio=1.0):
         self.hostname = hostname
         self.vcpus = vcpus
         self.memory_mb = memory_mb
         self.local_gb = local_gb
+        self.r_ratio = r_ratio
+        self.c_ratio = c_ratio
+        self.d_ratio = d_ratio
 
 
 class SchedulerFakeDriver(fake.FakeDriver):
@@ -68,15 +101,26 @@ def debug(*args, **kwargs):
 
 class BenchDriverScheduler(bench.BenchDriverBase):
     def __init__(self, meta, host_manager=None):
-        # self.host_manager = "shared_host_manager"
-        self.host_manager = "host_manager"
+        self.meta = meta
+        if self.meta.scheduler_type == "filter":
+            self.host_manager = "host_manager"
+            self.scheduler_driver = "filter_scheduler"
+        elif self.meta.scheduler_type == "caching":
+            self.host_manager = "host_manager"
+            self.scheduler_driver = "caching_scheduler"
+        elif self.meta.scheduler_type == "shared":
+            self.host_manager = "shared_host_manager"
+            self.scheduler_driver = "filter_scheduler"
+        else:
+            raise RuntimeError("Unsupported scheduler type: %s"
+                               % self.meta.scheduler_type)
+        self.resource = get_view(self.meta.v_type)
+        self.resource.hostname = self.meta.host
+        self.new_inject = self.meta.new_inject
         super(BenchDriverScheduler, self).__init__(meta)
 
     def _stubout_nova(self):
-        resource_view = ComputeResourceView(self.meta.host,
-                                            vcpus=8,
-                                            memory_mb=64*1024,  # 64G
-                                            local_gb=25*1024)   # 25TB
+        resource_view = self.resource
         SchedulerFakeDriver.prepare_resource(resource_view)
         self.patch('nova.virt.fake.SchedulerFakeDriver',
                    SchedulerFakeDriver,
@@ -91,13 +135,13 @@ class BenchDriverScheduler(bench.BenchDriverBase):
     def _stubout_conf(self):
         self.conf("compute_driver",
                   'nova.virt.fake.SchedulerFakeDriver')
-        self.conf("ram_allocation_ratio", 1.5)
-        self.conf("cpu_allocation_ratio", 16.0)
-        self.conf("disk_allocation_ratio", 1.5)
+        self.conf("ram_allocation_ratio", self.resource.r_ratio)
+        self.conf("cpu_allocation_ratio", self.resource.c_ratio)
+        self.conf("disk_allocation_ratio", self.resource.d_ratio)
         self.conf("reserved_host_disk_mb", 0)
         self.conf("reserved_host_memory_mb", 0)
         self.conf("scheduler_max_attempts", 5)
-        # self.conf("scheduler_driver", "caching_scheduler")
+        self.conf("scheduler_driver", self.scheduler_driver)
         self.conf("scheduler_default_filters",
                   ["RetryFilter",
                    "AvailabilityZoneFilter",
@@ -109,8 +153,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                    "ImagePropertiesFilter",
                    "ServerGroupAntiAffinityFilter",
                    "ServerGroupAffinityFilter"])
-        if self.host_manager:
-            self.conf("scheduler_host_manager", self.host_manager)
+        self.conf("scheduler_host_manager", self.host_manager)
 
     def _inject_logs(self):
         # nova api part
@@ -153,7 +196,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
         _from_spec = lambda args: args[2].instance_uuid
 
         def _get_host(kwargs):
-            if NEW_SCHEDULER:
+            if self.host_manager == "shared_host_manager" or self.new_inject:
                 return kwargs['ret_val'][0][0]['host']
             else:
                 return kwargs['ret_val'][0]['host']
