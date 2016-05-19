@@ -38,7 +38,7 @@ def get_view(v_type):
                                    local_gb=4*1024)
     elif v_type == "C":  # can only fit 1 host for flavor 154
         return ComputeResourceView(None,
-                                   vcpu=6,
+                                   vcpus=6,
                                    memory_mb=12*1024,
                                    local_gb=4*1024)
     else:

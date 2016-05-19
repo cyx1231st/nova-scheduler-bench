@@ -57,6 +57,8 @@ def main():
                         help="The DISK allocation ratio for each node.")
     parser.add_argument('--out-file', default=".requests",
                         help="The file to store requests")
+    parser.add_argument('--flavor', action="store_true",
+                        help="use flavor 154.")
     args = parser.parse_args()
     queue_requests(args)
 
@@ -74,7 +76,10 @@ def queue_requests(args):
     num_requests = 0
     requests = []
     while total_ram > 0:
-        res_tpl = random.choice(const.RESOURCE_TEMPLATES)
+        if not args.flavor:
+            res_tpl = random.choice(const.RESOURCE_TEMPLATES)
+        else:
+            res_tpl = const.RESOURCE_TEMPLATES[3]
         total_ram -= res_tpl[const.RAM_MB]
         if total_ram > 0:
             requests.append(res_tpl[const.FID])
