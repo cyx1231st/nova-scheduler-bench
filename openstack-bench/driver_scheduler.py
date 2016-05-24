@@ -19,9 +19,6 @@ from nova.virt import fake
 import bench
 
 
-NEW_SCHEDULER = False
-
-
 def get_view(v_type):
     if v_type == "A":
         return ComputeResourceView(None,
@@ -116,7 +113,9 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                                % self.meta.scheduler_type)
         self.resource = get_view(self.meta.v_type)
         self.resource.hostname = self.meta.host
-        self.new_inject = self.meta.new_inject
+        if meta.release not in ["mitaka", "kilo", "proto"]:
+            raise RuntimeError("Unsupported release: %s" % meta.release)
+        self.release = meta.release
         super(BenchDriverScheduler, self).__init__(meta)
 
     def _stubout_nova(self):
@@ -135,13 +134,15 @@ class BenchDriverScheduler(bench.BenchDriverBase):
     def _stubout_conf(self):
         self.conf("compute_driver",
                   'nova.virt.fake.SchedulerFakeDriver')
-        self.conf("ram_allocation_ratio", self.resource.r_ratio)
-        self.conf("cpu_allocation_ratio", self.resource.c_ratio)
-        self.conf("disk_allocation_ratio", self.resource.d_ratio)
+        if self.release != "kilo":
+            self.conf("ram_allocation_ratio", self.resource.r_ratio)
+            self.conf("cpu_allocation_ratio", self.resource.c_ratio)
+            self.conf("disk_allocation_ratio", self.resource.d_ratio)
+            self.conf("scheduler_driver", self.scheduler_driver)
+            self.conf("scheduler_host_manager", self.host_manager)
         self.conf("reserved_host_disk_mb", 0)
         self.conf("reserved_host_memory_mb", 0)
         self.conf("scheduler_max_attempts", 5)
-        self.conf("scheduler_driver", self.scheduler_driver)
         self.conf("scheduler_default_filters",
                   ["RetryFilter",
                    "AvailabilityZoneFilter",
@@ -153,13 +154,31 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                    "ImagePropertiesFilter",
                    "ServerGroupAntiAffinityFilter",
                    "ServerGroupAffinityFilter"])
-        self.conf("scheduler_host_manager", self.host_manager)
 
     def _inject_logs(self):
         # nova api part
         _from_create = lambda kwargs: kwargs['body']['server']['name']
+        if self.release == "kilo":
+            # there're two api entry points for "create"
+            create_point = \
+                "nova.api.openstack.compute.servers.Controller.create"
+            self.patch_aop(
+                    create_point,
+                    before=lambda *args, **kwargs:
+                        self.warn("%s received" % _from_create(kwargs)),
+                    after=lambda *args, **kwargs:
+                        self.warn("%s failed: %s"
+                                  % (_from_create(kwargs), kwargs['exc_val']))
+                        if kwargs['exc_val'] else
+                        self.warn("%s api returned" % _from_create(kwargs)))
+            create_point = \
+                "nova.api.openstack.compute.plugins.v3.servers.ServersController.create"
+        else:
+            # mitaka, proto
+            create_point = \
+                "nova.api.openstack.compute.servers.ServersController.create"
         self.patch_aop(
-                "nova.api.openstack.compute.servers.ServersController.create",
+                create_point,
                 before=lambda *args, **kwargs:
                     self.warn("%s received" % _from_create(kwargs)),
                 after=lambda *args, **kwargs:
@@ -193,12 +212,19 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                     self.warn("%s attempts %s"
                               % (args[1], args[0]['retry']['num_attempts'])))
 
-        _from_spec = lambda args: args[2].instance_uuid
+        if self.release == "kilo":
+            _from_spec = \
+                lambda args: args[2]["instance_properties"]["uuid"]
+        else:
+            # mitaka, proto
+            _from_spec = lambda args: args[2].instance_uuid
 
         def _get_host(kwargs):
-            if self.host_manager == "shared_host_manager" or self.new_inject:
+            if self.host_manager == "shared_host_manager" \
+                    or self.release == "proto":
                 return kwargs['ret_val'][0][0]['host']
             else:
+                # mitaka, kilo
                 return kwargs['ret_val'][0]['host']
 
         self.patch_aop(
@@ -223,7 +249,13 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                                  kwargs['node'])))
 
         # nova scheduler part
-        _from_spec_kw = lambda kwargs: kwargs['spec_obj'].instance_uuid
+        if self.release == "kilo":
+            _from_spec_kw = \
+                lambda kwargs: \
+                kwargs['request_spec']['instance_properties']["uuid"]
+        else:
+            # mitaka, proto
+            _from_spec_kw = lambda kwargs: kwargs['spec_obj'].instance_uuid
         self.patch_aop(
                 "nova.scheduler.manager.SchedulerManager.select_destinations",
                 before=lambda *args, **kwargs:
@@ -248,11 +280,18 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                 after=lambda *args, **kwargs: self.warn("-- finish_db"))
 
         # nova compute part
+        c_m_patch = None
+        if self.release == "kilo":
+            c_m_patch = lambda *args, **kwargs: \
+                self.warn("%s received" % args[2].display_name)
+        else:
+            # mitaka, proto
+            c_m_patch = lambda *args, **kwargs: \
+                self.warn("%s received" % kwargs['instance'].display_name)
+
         self.patch_aop(
                 "nova.compute.manager.ComputeManager.build_and_run_instance",
-                before=lambda *args, **kwargs:
-                    self.warn("%s received"
-                              % kwargs['instance'].display_name))
+                before=c_m_patch)
         self.patch_aop(
                 "nova.compute.manager.ComputeManager."
                 "_do_build_and_run_instance",

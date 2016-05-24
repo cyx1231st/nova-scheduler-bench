@@ -45,7 +45,6 @@ class BenchmarkMeta(object):
         self.folder = args.result_folder + "/"
         self.v_type = args.view
         self.scheduler_type = args.scheduler_type
-        self.new_inject = args.new
         """
         driver_name = args.driver
         try:
@@ -57,6 +56,7 @@ class BenchmarkMeta(object):
             self.enabled = False
             raise
         """
+        self.release = args.release.lower()
         import driver_scheduler
         self.driver = driver_scheduler.get_driver(self)
 
@@ -100,6 +100,7 @@ class BenchDriverBase(object):
         self._stubout_conf()
 
     def inject_logs(self):
+        bench_patching.AopPatch.logger = self.error
         self.patch_aop(
             "oslo_log.log.setup",
             after=lambda *args, **kwargs:
@@ -126,8 +127,16 @@ class BenchDriverBase(object):
     def warn(self, msg):
         LOG.warn(self.meta.log_prefix + msg)
 
+    def error(self, msg):
+        LOG.error(self.meta.log_prefix + msg)
+
+
+def printerror(error_str):
+    print(error_str)
+
 
 def init(args):
+    bench_patching.AopPatch.logger = printerror
     bench_patching.AopPatch(
         "nova.config.parse_args",
         after=lambda *args, **kwargs: patch_nova())

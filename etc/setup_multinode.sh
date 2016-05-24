@@ -13,7 +13,6 @@ hostname=$1
 cp ./1-setup-r.sh ../
 cp ./3-report-r.sh ../
 cp ./5-reset-r.sh ../
-cp helper-clear-log.sh ../
 cp run_suite_r.sh ../openstack-bench/
 
 sed -i -e "s/usr@host/$hostname/g" ../3-report-r.sh

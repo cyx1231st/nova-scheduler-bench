@@ -12,19 +12,40 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+
 class AopPatch(object):
+    logger = None
+
     def aop_wrapper(self, func):
         def aop_wrapped(*args, **kwargs):
             if self.before:
-                self.before(*args, **kwargs)
+                try:
+                    self.before(*args, **kwargs)
+                except Exception as e:
+                    self.logger(str(e))
+                    self.logger("args: %s" % repr(args))
+                    self.logger("kwargs: %s" % repr(kwargs))
+                    raise
             try:
                 ret = func(*args, **kwargs)
             except Exception as e:
                 if self.after:
-                    self.after(ret_val=None, exc_val=e, *args, **kwargs)
+                    try:
+                        self.after(ret_val=None, exc_val=e, *args, **kwargs)
+                    except Exception as e:
+                        self.logger(str(e))
+                        self.logger("args: %s" % repr(args))
+                        self.logger("kwargs: %s" % repr(kwargs))
+                        raise
                 raise
             if self.after:
-                self.after(ret_val=ret, exc_val=None, *args, **kwargs)
+                try:
+                    self.after(ret_val=ret, exc_val=None, *args, **kwargs)
+                except Exception as e:
+                    self.logger(str(e))
+                    self.logger("args: %s" % repr(args))
+                    self.logger("kwargs: %s" % repr(kwargs))
+                    raise
             return ret
         return aop_wrapped
 

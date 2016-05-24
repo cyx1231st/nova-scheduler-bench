@@ -41,13 +41,15 @@ def main():
                         help="The resource type loaded, A is normal, "
                         "B cannot hold any vm of flavor 154, "
                         "and C can only hold 1 vm of flavor 154.")
-    parser.add_argument('--new', action="store_true",
-                        help="The new code has a different inject point.")
     parser.add_argument('--scheduler-type',
-                        default="shared",
+                        default="filter",
                         help="filter: filter scheduler; "
                         "caching: caching scheduler; "
                         "shared: shared-state scheduler.")
+    parser.add_argument('--release',
+                        default="mitaka",
+                        help="The supported nova releases are mitaka and "
+                        "kilo and proto.")
     parser.add_argument("service",
                         help="Launched nova service type.")
     args = parser.parse_args()
