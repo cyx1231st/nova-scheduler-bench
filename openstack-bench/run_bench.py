@@ -44,7 +44,7 @@ def main():
     parser.add_argument('--new', action="store_true",
                         help="The new code has a different inject point.")
     parser.add_argument('--scheduler-type',
-                        default="shared",
+                        default="filter",
                         help="filter: filter scheduler; "
                         "caching: caching scheduler; "
                         "shared: shared-state scheduler.")
