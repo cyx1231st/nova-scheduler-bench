@@ -20,9 +20,6 @@ from itertools import chain
 import os
 from os import path
 
-SECONDS_OFFSET=False
-C_SCHEDULER=False
-
 
 class LogLine(object):
     def __init__(self, line, service, host, filename, offset):
@@ -30,20 +27,9 @@ class LogLine(object):
         self.line = line
         pieces = line.split()
         time_pieces = pieces[1].split(":")
-        if SECONDS_OFFSET:
-            seconds = float(time_pieces[2])
-            seconds_int = int(seconds)
-            seconds_fraction = (seconds - seconds_int) * 10
-            if seconds_fraction >= 1:
-                raise RuntimeError("seconds fraction must < 1!")
-            seconds = seconds_int + seconds_fraction
-            self.seconds = int(time_pieces[0]) * 3600 + \
-                int(time_pieces[1]) * 60 + \
-                float(seconds)
-        else:
-            self.seconds = int(time_pieces[0]) * 3600 + \
-                int(time_pieces[1]) * 60 + \
-                float(time_pieces[2])
+        self.seconds = int(time_pieces[0]) * 3600 + \
+            int(time_pieces[1]) * 60 + \
+            float(time_pieces[2])
         if service == "compute" and offset:
             self.seconds += offset
         self.time = pieces[1]
@@ -400,7 +386,7 @@ class StateMachine(object):
 
 
 class StateMachinesParser(object):
-    def __init__(self, state_machines):
+    def __init__(self, state_machines, args):
         self.total_requests = state_machines
         self.success_requests = []
         self.nvh_requests = []
@@ -498,7 +484,7 @@ class StateMachinesParser(object):
                           r, r_key, r_service):
             left = query[l]
             if l_key not in left.action:
-                print("Error, action doesn't match: %s, %s"
+                print("Error, left action doesn't match: %s, %s"
                       % (l_key, left.action))
                 raise RuntimeError()
             if l_service != left.service:
@@ -506,7 +492,7 @@ class StateMachinesParser(object):
                 raise RuntimeError()
             right = query[r]
             if r_key not in right.action:
-                print("Error, action doesn't match: %s, %s"
+                print("Error, right action doesn't match: %s, %s"
                       % (r_key, right.action))
                 raise RuntimeError()
             if r_service != right.service:
@@ -669,7 +655,7 @@ class StateMachinesParser(object):
                           1, "failed:", "api")
 
         c_offset=0
-        if C_SCHEDULER:
+        if args.caching:
             c_offset=-2
 
         for query in self.direct_successful_queries:
@@ -689,13 +675,13 @@ class StateMachinesParser(object):
                           13+c_offset, "received", "compute",
                           14+c_offset, "success", "compute")
 
-            if not C_SCHEDULER:
+            if not args.caching:
                 _set_interval(self._direct_schedb_intervals, query,
-                          7, "start_db", "scheduler",
-                          8, "finish_db", "scheduler")
+                              7, "start_db", "scheduler",
+                              8, "finish_db", "scheduler")
                 _set_interval(self._direct_gap_intervals, query,
-                          8, "finish_db", "scheduler",
-                          14, "success", "compute")
+                              8, "finish_db", "scheduler",
+                              14, "success", "compute")
             _set_interval(self._direct_filter_intervals, query,
                           6, "start scheduling", "scheduler",
                           9+c_offset, "finish scheduling", "scheduler")
@@ -739,10 +725,10 @@ class StateMachinesParser(object):
                           2, "received", "conductor",
                           11+c_offset, "failed:", "conductor")
 
-            if not C_SCHEDULER:
+            if not args.caching:
                 _set_interval(self._direct_schedb_intervals, query,
-                          7, "start_db", "scheduler",
-                          8, "finish_db", "scheduler")
+                              7, "start_db", "scheduler",
+                              8, "finish_db", "scheduler")
             _set_interval(self._direct_filter_intervals, query,
                           6, "start scheduling", "scheduler",
                           9+c_offset, "finish scheduling", "scheduler")
@@ -783,13 +769,13 @@ class StateMachinesParser(object):
                           13+c_offset, "received", "compute",
                           14+c_offset, "fail: retry", "compute")
 
-            if not C_SCHEDULER:
+            if not args.caching:
                 _set_interval(self._direct_schedb_intervals, query,
-                          7, "start_db", "scheduler",
-                          8, "finish_db", "scheduler")
+                              7, "start_db", "scheduler",
+                              8, "finish_db", "scheduler")
                 _set_interval(self._direct_gap_intervals, query,
-                          8, "finish_db", "scheduler",
-                          14, "fail: retry", "compute")
+                              8, "finish_db", "scheduler",
+                              14, "fail: retry", "compute")
             _set_interval(self._direct_filter_intervals, query,
                           6, "start scheduling", "scheduler",
                           9+c_offset, "finish scheduling", "scheduler")
@@ -1011,27 +997,40 @@ class Intervals(object):
                 / len(self.intervals))
 
     def x_y_incremental(self):
-        data0 = [(interval[0], 1) for interval in self.intervals]
-        data0.extend([(interval[1], -1) for interval in self.intervals])
+        data0 = [(round(interval[0], 6), 1) for interval in self.intervals]
+        data0.extend([(round(interval[1], 6), -1)
+                      for interval in self.intervals])
         data0.sort(key=lambda tup: tup[0])
 
         x_list = []
         y_list = []
+        start_x = None
         y = 0
         x = None
+        o_y = None
         for data in data0:
             if x is None:
                 x = data[0]
+                start_x = x
+                o_y = y
+                y += data[1]
             elif x != data[0]:
                 x_list.append(x)
+                y_list.append(o_y)
+                x_list.append(x+0.00001)
                 y_list.append(y)
                 x = data[0]
-            y += data[1]
+                o_y = y
+                y += data[1]
+            else:
+                y += data[1]
         if x is not None:
             x_list.append(x)
+            y_list.append(o_y)
+            x_list.append(x+0.00001)
             y_list.append(y)
 
-        return x_list, y_list
+        return x_list, y_list, start_x
 
     def x_y_lasts(self):
         x_list = [interval[0] for interval in self.intervals]
@@ -1059,7 +1058,7 @@ def generate_report(args, state_machines, schedulers, computes):
     ## number_of_conductor_workers
     ## number_of_max_retries
 
-    sm_parser = StateMachinesParser(state_machines)
+    sm_parser = StateMachinesParser(state_machines, args)
     count_total_requests = len(sm_parser.total_requests)
     count_successful_requests = len(sm_parser.success_requests)
     count_nvh_requests = len(sm_parser.nvh_requests)
@@ -1314,6 +1313,9 @@ def main():
                         type=float,
                         default=0,
                         help="The compute nodes are remote.")
+    parser.add_argument('--caching',
+                        action="store_true",
+                        help="translate caching scheduler logs.")
     args = parser.parse_args()
     current_path = path.dirname(os.path.realpath(__file__))
     current_path = path.join(current_path, args.folder)
