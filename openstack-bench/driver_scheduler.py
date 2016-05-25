@@ -278,6 +278,11 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                 "FilterScheduler._get_all_host_states",
                 before=lambda *args, **kwargs: self.warn("-- start_db"),
                 after=lambda *args, **kwargs: self.warn("-- finish_db"))
+        self.patch_aop(
+                "nova.scheduler.caching_scheduler."
+                "CachingScheduler._get_all_host_states",
+                before=lambda *args, **kwargs: self.warn("-- start_db"),
+                after=lambda *args, **kwargs: self.warn("-- finish_db"))
 
         # nova compute part
         c_m_patch = None
