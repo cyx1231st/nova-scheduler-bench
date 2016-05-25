@@ -148,7 +148,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                    "AvailabilityZoneFilter",
                    "RamFilter",
                    "DiskFilter",
-                   "CoreFilter",
+                   # "CoreFilter",
                    "ComputeFilter",
                    "ComputeCapabilitiesFilter",
                    "ImagePropertiesFilter",
