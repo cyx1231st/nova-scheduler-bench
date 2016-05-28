@@ -689,12 +689,16 @@ class RequestStateMachine(object):
         tracking_dict = {}
         ps = self.paces[0]
         retries = 0
+
+        r_from = None
+
         while ps:
             node_id = ps.node.id
             if node_id == 2:
                 if retries == 1:
                     tracking_dict.pop(0)
                     tracking_dict.pop(1)
+                    r_from = ps.log.seconds
             elif node_id == 3:
                 retries += 1
             if node_id in end_dict:
@@ -713,7 +717,12 @@ class RequestStateMachine(object):
                 tracking_dict[node_id] = ps.nxt.log.seconds
             ps = ps.nxt
 
-        return ret_dict, ret_d_dict
+        retry_interval = None
+        if r_from is not None:
+            retry_interval = (r_from, self.pace.log.seconds,
+                              self.pace.log.seconds-r_from)
+
+        return ret_dict, ret_d_dict, retry_interval
 
     def report(self):
         if self.state in [self.SUCCESS,
@@ -1065,6 +1074,7 @@ class RequestStateMachinesParser(object):
 
         self.wall_clock_total = end_time - start_time
 
+        _i_apif = set([(0, 20)])
         _i_api = set([(0, 20), (0, 2)])
         _i_atc = set([(1, 3)])
         _i_con1 = set([(2, 5), (2, 21)])
@@ -1084,18 +1094,21 @@ class RequestStateMachinesParser(object):
 
         _i_qall = _i_api | _i_con | _i_sch | _i_com
         _i_qdir = _i_qall | _i_atc | _i_cts | _i_stc | _i_contc \
-            | _i_fil | _i_cac | _i_gap | _i_sus
+            | _i_fil | _i_cac | _i_gap | _i_sus | _i_apif
 
         _dict_complete = collections.defaultdict(list)
         _dict_direct = collections.defaultdict(list)
+        _retries = []
 
         for stm in self._available_stms:
-            _c, _d = stm.get_intervals(_i_qall, _i_qdir)
+            _c, _d, _r = stm.get_intervals(_i_qall, _i_qdir)
 
             for k, v in _c.items():
                 _dict_complete[k].extend(v)
             for k, v in _d.items():
                 _dict_direct[k].extend(v)
+            if _r is not None:
+                _retries.append(_r)
 
         def _get_intervals(input_dict, input_set):
             ret = []
@@ -1124,6 +1137,9 @@ class RequestStateMachinesParser(object):
         self.intervals_direct_cache_refresh = _get_intervals(_dict_direct,
                                                              _i_cac)
         self.intervals_direct_gap = _get_intervals(_dict_direct, _i_gap)
+
+        self.intervals_api_fail = _get_intervals(_dict_direct, _i_apif)
+        self.intervals_retry = Intervals(_retries)
 
 
 class StateMachinesParser(object):
