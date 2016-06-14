@@ -28,8 +28,17 @@ class LogLine(object):
         pieces = line.split()
 
         # service, host
-        pieces7 = pieces[7].split('-')
-        self.host = pieces7[2][:-1]
+        pieces7 = None
+        index = 0
+        for piece in pieces:
+            if piece.startswith("BENCH-"):
+                pieces7 = piece
+                break
+            index += 1
+        pieces7 = pieces7.split('-')
+        host_pieces = pieces7[2:]
+        host_pieces[-1] = pieces7[-1][:-1]
+        self.host = '-'.join(host_pieces)
         self.service = pieces7[1]
 
         self.filename = log_file.name
@@ -52,7 +61,7 @@ class LogLine(object):
             float(time_pieces[2])
         
         # instance_id, instance_name
-        instance_info = pieces[8]
+        instance_info = pieces[index+1]
         self.instance_id = "?"
         self.instance_name = "?"
         if instance_info == "--":
@@ -67,8 +76,8 @@ class LogLine(object):
             self.instance_name = instance_info
 
         self.time = pieces[1]
-        self.request_id = pieces[4][5:]
-        self.action = " ".join(pieces[9:])
+        self.request_id = pieces[index-3][5:]
+        self.action = " ".join(pieces[index+2:])
         self.correct = True
 
     def __repr__(self):
@@ -381,15 +390,15 @@ class RequestStateMachine(object):
             if log.service == "api":
                 ps = pace
                 while ps:
-                    if ps.edge.diagram == self.graph.diagrams.api:
-                        ps.more.append(log)
-                        break
+		    if ps.edge.diagram == self.graph.diagrams.api:
+			ps.more.append(log)
+			break
                     ps = ps.bfo
                 if not ps:
                     raise RuntimeError("cannot place more")
             else:
                 pace.more.append(log)
-            self.extras.add(pace)
+            self.extras.add(log)
             return True
         else:
             # next
@@ -442,6 +451,7 @@ class RequestStateMachine(object):
         self.comp_end_slot = None
 
         self.logs = controller_logs
+        self.more_logs = []
 
         for log in controller_logs:
             if self.pace.node.end is True:
@@ -1272,16 +1282,16 @@ class LogFile(object):
         for i in range(0, len(self.log_lines)):
             ret = self.log_lines[i].apply(relation, relation_name,
                                           self.log_lines, i)
-            if ret is not True:
+            if ret is not True and len(ret) == 36:
                 mismatch_errors.add(ret)
-                self.log_lines[i].correct = False
+                # self.log_lines[i].correct = False
         return mismatch_errors
 
     def catg_logs(self, name_errors, mismatch_errors):
         for log in self.log_lines:
             if log.correct and log.instance_name not in name_errors \
-                    and log.instance_name not in mismatch_errors \
                     and log.instance_id not in mismatch_errors:
+                    # and log.instance_name not in mismatch_errors \
                 self.logs_by_ins[log.instance_name].append(log)
             else:
                 self.errors.append(log)
@@ -1298,8 +1308,8 @@ class LogFile(object):
 
 class LogCollector(object):
     def __init__(self, log_folder):
-        self.api = None
-        self.conductor = None
+        self.api = {}
+        self.conductor = {}
         self.schedulers = {}
         self.computes = {}
         self.log_files = []
@@ -1314,23 +1324,26 @@ class LogCollector(object):
                 continue
             if f.startswith("out"):
                 continue
+            if not f.startswith("BENCH"):
+                continue
             f = LogFile(f, file_dir, self.relation)
             if f.service == "api":
-                if not self.api:
-                    self.api = f
+                if f.host not in self.api:
+                    self.api[f.host] = f
                     self.log_files.append(f)
                 else:
                     raise RuntimeError("There's already a log for api: %s, "
                                        "but there is another one: %s"
-                                       % (self.api.name, f.name))
+                                       % (self.api[f.host].name, f.name))
+
             elif f.service == "conductor":
-                if not self.conductor:
-                    self.conductor = f
+                if f.host not in self.conductor:
+                    self.conductor[f.host] = f
                     self.log_files.append(f)
                 else:
                     raise RuntimeError("There's already a log for conductor: "
                                        "%s, but there is another one: %s"
-                                       % (self.conductor.name, f.name))
+                                       % (self.conductor[f.host].name, f.name))
             elif f.service == "scheduler":
                 if f.host not in self.schedulers:
                     self.schedulers[f.host] = f
@@ -1371,8 +1384,8 @@ class LogCollector(object):
 
         # apply relations
         for lf in self.log_files:
-            mismatch_errors.union(lf.apply_relation(self.relation,
-                                                    relation_name))
+            mismatch_errors = mismatch_errors.union(lf.apply_relation(self.relation,
+                                                                      relation_name))
 
         for lf in self.log_files:
             lf.catg_logs(name_errors, mismatch_errors)
@@ -1385,10 +1398,12 @@ class LogCollector(object):
 
         active_schedulers, active_computes = 0, 0
 
-        for key, values in self.api.logs_by_ins.items():
+        for api in self.api.values():
+        for key, values in api.logs_by_ins.items():
             controller_logs[key].extend(values)
-        for key, values in self.conductor.logs_by_ins.items():
-            controller_logs[key].extend(values)
+        for cond in self.conductor.values():
+            for key, values in cond.logs_by_ins.items():
+                controller_logs[key].extend(values)
         for sche in self.schedulers.values():
             if sche.logs_by_ins:
                 active_schedulers += 1
@@ -1445,6 +1460,17 @@ def main():
         stm.check()
         stm.report()
         status_count1[stm.state] += 1
+    extra_names = []
+    for name in group_by_state_machine1.keys():
+        if name[0] != 'p':
+            extra_names.append(name)
+            continue
+        else:
+            try:
+                int(name[1:])
+            except Exception:
+                extra_names.append(name)
+                continue
 
     print("")
     print(" >> LOG SUMMARY")
@@ -1454,9 +1480,14 @@ def main():
     for key in status_count1.keys():
         print ("  %s requests: %d" % (key, status_count1[key]))
     if name_errors:
+        print("duplicated instance names: %s" % len(name_errors))
         print("duplicated instance names: %s" % name_errors)
     if mismatch_errors:
+        print("mismatched names and ids: %s" % len(mismatch_errors))
         print("mismatched names and ids: %s" % mismatch_errors)
+    if extra_names:
+        print("extra names: %s" % len(extra_names))
+        print("extra names: %s" % extra_names)
     if args.brief:
         return
 
