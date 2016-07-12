@@ -1399,8 +1399,8 @@ class LogCollector(object):
         active_schedulers, active_computes = 0, 0
 
         for api in self.api.values():
-        for key, values in api.logs_by_ins.items():
-            controller_logs[key].extend(values)
+            for key, values in api.logs_by_ins.items():
+                controller_logs[key].extend(values)
         for cond in self.conductor.values():
             for key, values in cond.logs_by_ins.items():
                 controller_logs[key].extend(values)

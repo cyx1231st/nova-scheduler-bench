@@ -113,7 +113,7 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                                % self.meta.scheduler_type)
         self.resource = get_view(self.meta.v_type)
         self.resource.hostname = self.meta.host
-        if meta.release not in ["mitaka", "kilo", "proto"]:
+        if meta.release not in ["mitaka+", "mitaka", "kilo", "proto"]:
             raise RuntimeError("Unsupported release: %s" % meta.release)
         self.release = meta.release
         super(BenchDriverScheduler, self).__init__(meta)
@@ -132,8 +132,13 @@ class BenchDriverScheduler(bench.BenchDriverBase):
                    fake_check_requested_networks)
 
     def _stubout_conf(self):
-        self.conf("compute_driver",
-                  'nova.virt.fake.SchedulerFakeDriver')
+        if self.release == "mitaka+":
+            self.conf("compute_driver",
+                      'fake.SchedulerFakeDriver')
+        else:
+            self.conf("compute_driver",
+                      'nova.virt.fake.SchedulerFakeDriver')
+
         if self.release != "kilo":
             self.conf("ram_allocation_ratio", self.resource.r_ratio)
             self.conf("cpu_allocation_ratio", self.resource.c_ratio)

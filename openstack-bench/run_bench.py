@@ -49,9 +49,9 @@ def main():
                         "caching: caching scheduler; "
                         "shared: shared-state scheduler.")
     parser.add_argument('--release',
-                        default="mitaka",
-                        help="The supported nova releases are mitaka, "
-                        "kilo and proto.")
+                        default="mitaka+",
+                        help="The supported nova releases are mitaka+, "
+                        "mitaka, kilo and proto.")
     parser.add_argument("service",
                         help="Launched nova service type: compute, api, "
                         "scheduler, conductor.")
