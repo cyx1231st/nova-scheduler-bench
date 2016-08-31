@@ -4,8 +4,8 @@ pushd $TOP_DIR > /dev/null
 
 remote="usr@host"
 
-./openstack-bench/killall.sh >/dev/null 2>&1 &
-ssh $remote "~/nova-scheduler-bench/openstack-bench/killall.sh"
+./openstack_bench/openstack_patcher/killall.sh >/dev/null 2>&1 &
+ssh $remote "~/nova-scheduler-bench/openstack_bench/openstack_patcher/killall.sh"
 rm .requests >/dev/null 2>&1 &
 
 mysql --database='nova' --execute=\

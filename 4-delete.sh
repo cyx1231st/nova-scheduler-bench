@@ -52,10 +52,10 @@ do
     sleep 1
 done
 
-for file in `ls ./openstack-bench/results`; do
-    > "./openstack-bench/results/$file"
+for file in `ls ./openstack_bench/openstack_patcher/results`; do
+    > "./openstack_bench/openstack_patcher/results/$file"
 done
-echo "Cleared the logs in ./openstack-bench/results/"
+echo "Cleared the logs in ./openstack_bench/openstack_patcher/results/"
 
 watch -n 5 "nova list"
 

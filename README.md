@@ -74,13 +74,13 @@ $nova service-list
 ### 2-create.sh
 
 Send requests to nova based on the generated flavors from "1-setup.sh". The
-runtime logs are collected in folder "./openstack-bench/results/". Make sure
-all the requests are completely handled by nova. Here is an example
-benchmarking run using 2 schedulers, 5 compute nodes and sending 50 concurrent
-requests.
+runtime logs are collected in folder
+"./openstack_bench/openstack_patcher/results/". Make sure all the requests are
+completely handled by nova. Here is an example benchmarking run using 2
+schedulers, 5 compute nodes and sending 50 concurrent requests.
 ```
 $ ./2-create.sh
-python parse.py ./openstack-bench/results --brief
+python parse.py ./openstack_bench/openstack_patcher/results --brief
 
  >> LOG SUMMARY
 Active schedulers: 2
@@ -91,8 +91,8 @@ Total requests count: 50
 
 ### 3-report.sh
 
-See the complete report by parsing the logs in "./openstack-bench/results/" and
-move them to "./results/".
+See the complete report by parsing the logs in
+"./openstack_bench/openstack_patcher/results/" and move them to "./results/".
 For example:
 ```
 $ ./3-report.sh

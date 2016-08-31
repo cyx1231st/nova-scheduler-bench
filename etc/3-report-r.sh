@@ -13,8 +13,8 @@ fi
 
 mkdir $result_folder
 rm $result_folder/*
-cp -r openstack-bench/$result_folder/* ./$result_folder
-scp $remote:~/nova-scheduler-bench/openstack-bench/$result_folder/* ./$result_folder
+cp -r openstack_bench/openstack_patcher/$result_folder/* ./$result_folder
+scp $remote:~/nova-scheduler-bench/openstack_bench/openstack_patcher/$result_folder/* ./$result_folder
 python parse.py --offset $1 $result_folder
 echo "Done"
 

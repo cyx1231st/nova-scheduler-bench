@@ -2,7 +2,7 @@
 TOP_DIR=$(cd $(dirname "$0") && pwd)
 pushd $TOP_DIR > /dev/null
 
-./openstack-bench/killall.sh >/dev/null 2>&1 &
+./openstack_bench/openstack_patcher/killall.sh >/dev/null 2>&1 &
 rm .requests >/dev/null 2>&1 &
 
 mysql --database='nova' --execute=\
