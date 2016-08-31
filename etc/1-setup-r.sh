@@ -14,7 +14,7 @@ max=$3
 
 ./openstack_bench/openstack_patcher/run_suite.sh $schedulers 0
 echo "Launched $schedulers schedulers and 0 nodes"
-python queue_requests.py $nodes $max
+python ./openstack_bench/utils/queue_requests.py $nodes $max
 echo "Queued for $nodes nodes with $max max requests to .requests"
 
 popd > /dev/null

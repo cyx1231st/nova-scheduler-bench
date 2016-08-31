@@ -17,6 +17,8 @@ from __future__ import print_function
 import argparse
 import logging
 import math
+import os
+from os import path
 import random
 
 import const
@@ -87,16 +89,17 @@ def queue_requests(args):
             if num_requests >= args.max:
                 break
 
-    with open(args.out_file, 'w') as outfile:
+    out_path = os.getcwd()
+    out_path = path.join(out_path, args.out_file)
+    with open(out_path, 'w') as outfile:
         outfile.write("request_list=( ")
         for req in requests:
             outfile.write(str(req) + " ")
         outfile.write(")")
-    print("Wrote instance requests to output file %s." %
-             args.out_file)
+    print("Wrote instance requests to output file %s." % out_path)
 
     print("Placed %d instance requests into queue." % num_requests)
-    
+
 
 if __name__ == '__main__':
     main()
