@@ -59,7 +59,7 @@ class LogLine(object):
         self.seconds = int(time_pieces[0]) * 3600 + \
             int(time_pieces[1]) * 60 + \
             float(time_pieces[2])
-        
+
         # instance_id, instance_name
         instance_info = pieces[index+1]
         self.instance_id = "?"
@@ -1433,7 +1433,8 @@ def main():
     parser.add_argument('--outfile',
                         help="The output file of report.")
     args = parser.parse_args()
-    current_path = path.dirname(os.path.realpath(__file__))
+    # current_path = path.dirname(os.path.realpath(__file__))
+    current_path = os.getcwd()
     current_path = path.join(current_path, args.folder)
 
     log_collector = LogCollector(current_path)

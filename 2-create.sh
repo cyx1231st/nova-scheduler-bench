@@ -79,7 +79,7 @@ then
     done
 fi
 
-watch "python parse.py ./openstack_bench/openstack_patcher/results --brief"
+watch "python ./openstack_bench/log_parser/parse.py ./openstack_bench/openstack_patcher/results --brief"
 
 echo "Done, requested $counter instances!"
 

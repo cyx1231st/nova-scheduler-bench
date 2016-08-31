@@ -7,7 +7,7 @@ result_folder="results"
 mkdir $result_folder
 rm $result_folder/*
 cp -r openstack_bench/openstack_patcher/$result_folder/* ./$result_folder
-python parse.py $result_folder
+python ./openstack_bench/log_parser/parse.py $result_folder
 
 echo "Done!"
 
