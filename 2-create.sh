@@ -55,11 +55,9 @@ echo "Got image id: $IMAGE"
 counter=0
 if [ -e .requests ]
 then
-    pushd "openstack_bench/openstack_patcher" >/dev/null
-    result_folder="results"
+    result_folder="runtime_logs"
     mkdir -p $result_folder
     rm $result_folder/*
-    popd > /dev/null
 
     source .requests
     for i in "${request_list[@]}"
@@ -79,7 +77,7 @@ then
     done
 fi
 
-watch "python ./openstack_bench/log_parser/parse.py ./openstack_bench/openstack_patcher/results --brief"
+watch "python ./openstack_bench/log_parser/parse.py ./runtime_logs --brief"
 
 echo "Done, requested $counter instances!"
 

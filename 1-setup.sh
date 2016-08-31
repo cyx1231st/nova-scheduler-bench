@@ -12,7 +12,7 @@ schedulers=$1
 nodes=$2
 max=$3
 
-./openstack_bench/openstack_patcher/run_suite.sh $schedulers $nodes
+./scripts/run_suite.sh $schedulers $nodes
 echo "Launched $schedulers schedulers and $nodes nodes"
 python ./openstack_bench/utils/queue_requests.py $nodes $max
 echo "Queued for $nodes nodes with $max max requests to .requests"
