@@ -1497,6 +1497,3 @@ def main():
                     sm_parser1,
                     active_schedulers,
                     active_computes)
-
-if __name__ == "__main__":
-    main()
