@@ -20,6 +20,8 @@ from nova.cmd import conductor
 from nova.cmd import scheduler
 
 import patching as bench_patching
+from openstack_bench.config import CONF_BENCH
+from openstack_bench import bench_drivers
 
 
 BENCH = None
@@ -39,20 +41,11 @@ class BenchmarkMeta(object):
         self.folder = args.result_folder + "/"
         self.v_type = args.view
         self.scheduler_type = args.scheduler_type
-        """
-        driver_name = args.driver
-        try:
-            module = __import__(driver_name, globals(), level=1)
-            self.driver = module.get_driver(self)
-            if not isinstance(self.driver, BenchDriverBase):
-                raise RuntimeError()
-        except Exception:
-            self.enabled = False
-            raise
-        """
         self.release = args.release.lower()
-        from openstack_bench.bench_drivers import driver_scheduler
-        self.driver = driver_scheduler.get_driver(self)
+
+        driver_class_name = CONF_BENCH.bench_driver
+        driver_obj = bench_drivers.init_driver(driver_class_name, self)
+        self.driver = driver_obj
 
 
 def printerror(error_str):

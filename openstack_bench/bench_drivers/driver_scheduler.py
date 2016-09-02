@@ -16,7 +16,9 @@ from nova import exception
 from nova.network import model as network_model
 from nova.virt import fake
 
-from openstack_bench import bench_drivers
+from openstack_bench.bench_drivers import register_driver
+
+import bases
 
 
 def get_view(v_type):
@@ -96,7 +98,7 @@ def debug(*args, **kwargs):
     pdb.set_trace()
 
 
-class BenchDriverScheduler(bench_drivers.BenchDriverBase):
+class BenchDriverScheduler(bases.BenchDriverBase):
     def __init__(self, meta, host_manager=None):
         self.meta = meta
         if self.meta.scheduler_type == "filter":
@@ -328,8 +330,5 @@ class BenchDriverScheduler(bench_drivers.BenchDriverBase):
         """
 
 
-bench_drivers.register_driver("driver_scheduler", BenchDriverScheduler)
-
-
-def get_driver(meta):
-    return BenchDriverScheduler(meta)
+# TODO: implement this in the metaclass
+register_driver("driver_scheduler", BenchDriverScheduler)
