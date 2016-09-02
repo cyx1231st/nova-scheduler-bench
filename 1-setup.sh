@@ -14,7 +14,7 @@ max=$3
 
 ./scripts/run_suite.sh $schedulers $nodes
 echo "Launched $schedulers schedulers and $nodes nodes"
-python ./openstack_bench/utils/queue_requests.py $nodes $max
+python ./openstack_bench/queue_requests.py $nodes $max
 echo "Queued for $nodes nodes with $max max requests to .requests"
 
 popd > /dev/null
