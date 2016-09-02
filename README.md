@@ -80,7 +80,7 @@ completely handled by nova. Here is an example benchmarking run using 2
 schedulers, 5 compute nodes and sending 50 concurrent requests.
 ```
 $ ./2-create.sh
-python parse.py ./openstack_bench/openstack_patcher/results --brief
+python parse.py ./runtime_logs --brief
 
  >> LOG SUMMARY
 Active schedulers: 2

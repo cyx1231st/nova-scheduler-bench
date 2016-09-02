@@ -21,7 +21,7 @@ import os
 from os import path
 import random
 
-from utils import const
+from openstack_bench.utils import const
 
 DEFAULT_RAM_MB_PER_NODE = 64 * 1024
 DEFAULT_CPU_CORES_PER_NODE = 8

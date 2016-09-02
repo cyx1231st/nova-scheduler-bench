@@ -8,7 +8,7 @@ runtime_folder="runtime_logs"
 mkdir $result_folder
 rm $result_folder/*
 cp -r ./$runtime_folder/* ./$result_folder
-python ./openstack_bench/parse.py $result_folder
+python parse.py $result_folder
 
 echo "Done!"
 

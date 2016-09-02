@@ -77,7 +77,7 @@ then
     done
 fi
 
-watch "python ./openstack_bench/parse.py ./runtime_logs --brief"
+watch "python parse.py ./runtime_logs --brief"
 
 echo "Done, requested $counter instances!"
 
