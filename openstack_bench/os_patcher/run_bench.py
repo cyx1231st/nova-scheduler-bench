@@ -29,38 +29,11 @@ def main():
                         help="If set, service will be started using this "
                              "hostname instead of machine name. Used for "
                              "start parallel services in the same host.")
-    """
-    parser.add_argument('--driver',
-                        default=bench.BenchmarkMeta.DEFAULT_DRIVER,
-                        help="If set, the benchmark driver will be changed, "
-                             "the default is driver_scheduler.")
-    """
     parser.add_argument('--result-folder',
                         default=".",
                         help="If set, the logs will be in that folder.")
-    # TODO
-    parser.add_argument('--view',
-                        default="A",
-                        help="The resource type loaded, A is normal, "
-                        "B cannot hold any vm of flavor 154, "
-                        "and C can only hold 1 vm of flavor 154.")
-    # TODO
-    parser.add_argument('--scheduler-type',
-                        default="filter",
-                        help="filter: filter scheduler; "
-                        "caching: caching scheduler; "
-                        "shared: shared-state scheduler.")
-    # TODO
-    parser.add_argument('--release',
-                        default="mitaka+",
-                        help="The supported nova releases are mitaka+, "
-                        "mitaka, kilo and proto.")
     parser.add_argument("service",
                         help="Launched nova service type: compute, api, "
                         "scheduler, conductor.")
     args = parser.parse_args()
-    if args.scheduler_type != "filter" and args.release == "kilo":
-        parser.error("--release kilo only supports --scheduler-type filter!")
-    if args.scheduler_type == "shared" and args.release != "proto":
-        parser.error("--scheduler-type shared only supports --release proto!")
     bench.init(args)

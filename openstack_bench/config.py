@@ -12,26 +12,60 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import os
-from os import path
-
 from oslo_config import cfg
 
-from openstack_bench import bench_drivers
-
-
-_file_path = path.dirname(os.path.realpath(__file__))
-_DIR = path.join(_file_path, "../bench.conf")
 
 CONF_BENCH = cfg.ConfigOpts()
 
 
-_default_opts = [
-    cfg.StrOpt("bench_driver",
-               choices=bench_drivers.get_driver_names(),
-               default=bench_drivers.DEFAULT_DRIVER),
-]
+def _register_opts():
+    import os
+    from os import path
+
+    from openstack_bench import bench_drivers
+    from openstack_bench.os_patcher.patchers.consts import DEFAULT_SCHEDULER_TYPE
+    from openstack_bench.os_patcher.patchers.consts import SchedulerType
+    from openstack_bench import releases
+
+    default_opts = [
+        cfg.StrOpt("bench_driver",
+                   choices=bench_drivers.get_driver_names(),
+                   default=bench_drivers.DEFAULT_DRIVER),
+    ]
+
+    NOVA_PATCHER_GROUP = "nova_patcher"
+    _nova_opts = [
+        cfg.StrOpt("release",
+                   choices=releases.Release.__members__.keys(),
+                   default=releases.DEFAULT_RELEASE.name),
+        cfg.BoolOpt("enable_simulation",
+                    default=True),
+        cfg.StrOpt("scheduler_type",
+                   default=DEFAULT_SCHEDULER_TYPE.name,
+                   choices=SchedulerType.__members__.keys()),
+        cfg.FloatOpt("ram_allocation_ratio",
+                     default=1.5),
+        cfg.FloatOpt("cpu_allocation_ratio",
+                     default=16.0),
+        cfg.FloatOpt("disk_allocation_ratio",
+                     default=1.5),
+        cfg.IntOpt("vcpus",
+                   default=8),
+        cfg.IntOpt("memory_mb",
+                   default=64*1024),
+        cfg.IntOpt("disk_gb",
+                   default=25*1024),
+    ]
+
+    CONF_BENCH.register_opts(default_opts)
+
+    CONF_BENCH.register_group(cfg.OptGroup(name=NOVA_PATCHER_GROUP,
+                                           title="Nova Patcher"))
+    CONF_BENCH.register_opts(_nova_opts, group=NOVA_PATCHER_GROUP)
+
+    file_path = path.dirname(os.path.realpath(__file__))
+    DIR = path.join(file_path, "../bench.conf")
+    CONF_BENCH(['--config-file', DIR], project="bench")
 
 
-CONF_BENCH.register_opts(_default_opts)
-CONF_BENCH(['--config-file', _DIR], project="bench")
+_register_opts()

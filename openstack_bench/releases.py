@@ -1,6 +1,12 @@
-LATEST = "mitaka+"
-MITAKA = "mitaka"
-KILO = "kilo"
-PROTOTYPE = "prototype"
+from enum import Enum
 
-ALL = [LATEST, MITAKA, KILO, PROTOTYPE]
+
+class Release(Enum):
+    # default
+    LATEST = 13.5
+    MITAKA = 13
+    KILO = 11
+    PROTOTYPE = "prototype"
+
+
+DEFAULT_RELEASE = Release.LATEST

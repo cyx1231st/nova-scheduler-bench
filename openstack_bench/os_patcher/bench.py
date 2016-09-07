@@ -18,23 +18,14 @@ from openstack_bench import bench_drivers
 
 class BenchmarkMeta(object):
     DEFAULT_HOST = "_local_"
-    DEFAULT_DRIVER = "driver_scheduler"
 
     def __init__(self, args):
-        self.enabled = True
         self.host = args.host
         self.is_debug = args.debug
         self.is_console = args.console
         self.service = args.service
         self.log_prefix = "BENCH-" + self.service + "-" + self.host + ": "
         self.folder = args.result_folder + "/"
-        self.v_type = args.view
-        self.scheduler_type = args.scheduler_type
-        self.release = args.release.lower()
-
-        driver_class_name = CONF_BENCH.bench_driver
-        driver_obj = bench_drivers.init_driver(driver_class_name, self)
-        self.driver = driver_obj
 
 
 def init(args):

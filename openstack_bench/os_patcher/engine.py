@@ -16,15 +16,49 @@ class PatchEngine(object):
     def __init__(self, meta, driver_obj):
         self.meta = meta
         self.driver_obj = driver_obj
-        self.nova_patcher = NovaPatcher()
+        # TODO: build patcher from driver
+        self.patcher = NovaPatcher()
 
     def _apply_patch(self):
-        self.driver_obj.stubout_nova()
-        self.driver_obj.stubout_conf()
+        self.patcher.stub_out_modules()
+
+        # Replace host if DEFAULT_HOST not set
+        if self.meta.host and self.meta.host != self.meta.DEFAULT_HOST:
+            self.patcher.conf("host", self.meta.host)
+
+        # Enable console mode
+        if not self.meta.is_console:
+            self.patcher.conf(
+                "logging_default_format_string",
+                "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [-] "
+                "%(instance)s%(message)s")
+            self.patcher.conf(
+                "logging_debug_format_suffix",
+                "from (pid=%(process)d) %(funcName)s "
+                "%(pathname)s:%(lineno)d")
+            self.patcher.conf(
+                "logging_exception_prefix",
+                "%(asctime)s.%(msecs)03d TRACE %(name)s %(instance)s")
+            self.patcher.conf(
+                "logging_context_format_string",
+                "%(asctime)s.%(msecs)03d %(levelname)s %(name)s "
+                "[%(request_id)s %(user_name)s %(project_name)s] "
+                "%(instance)s%(message)s")
+            self.patcher.conf(
+                "log_file",
+                self.meta.folder + "BENCH-" + self.meta.service + "-"
+                + self.meta.host + ".log")
+
+        # Enable debug mode
+        self.patcher.conf("debug", self.meta.is_debug)
+
+        # self.driver_obj.stubout_conf()
+        self.patcher.override_configurations()
+
         self.driver_obj.inject_logs()
 
     def subvirt(self, service_name):
-        self.nova_patcher.stub_entrypoint(self._apply_patch)
+        self.patcher.stub_entrypoint(self._apply_patch)
 
         sys.argv = [""]
         sys.argv.append("--config-file")

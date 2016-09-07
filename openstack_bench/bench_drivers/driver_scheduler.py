@@ -13,84 +13,12 @@
 # under the License.
 
 from nova import exception
-from nova.network import model as network_model
-from nova.virt import fake
 
 from openstack_bench.bench_drivers import register_driver
+from openstack_bench.config import CONF_BENCH
+from openstack_bench.releases import Release
 
 import bases
-
-
-def get_view(v_type):
-    if v_type == "A":
-        return ComputeResourceView(None,
-                                   vcpus=8,
-                                   memory_mb=64*1024,  # 64G
-                                   local_gb=25*1024,   # 25TB
-                                   r_ratio=1.5,
-                                   c_ratio=16,
-                                   d_ratio=1.5)
-    elif v_type == "B":  # cannot place flavor 154
-        return ComputeResourceView(None,
-                                   vcpus=3,
-                                   memory_mb=4*1024,
-                                   local_gb=4*1024)
-    elif v_type == "C":  # can only fit 1 host for flavor 154
-        return ComputeResourceView(None,
-                                   vcpus=6,
-                                   memory_mb=12*1024,
-                                   local_gb=4*1024)
-    else:
-        raise RuntimeError("Unsupported view option: %s" % v_type)
-
-
-class ComputeResourceView(object):
-    def __init__(self,
-                 hostname,
-                 vcpus=4,
-                 memory_mb=2048,
-                 local_gb=1024,
-                 r_ratio=1.0,
-                 c_ratio=1.0,
-                 d_ratio=1.0):
-        self.hostname = hostname
-        self.vcpus = vcpus
-        self.memory_mb = memory_mb
-        self.local_gb = local_gb
-        self.r_ratio = r_ratio
-        self.c_ratio = c_ratio
-        self.d_ratio = d_ratio
-
-
-class SchedulerFakeDriver(fake.FakeDriver):
-    vcpus = 4
-    memory_mb = 8192
-    local_gb = 1024
-
-    @classmethod
-    def prepare_resource(cls, resource):
-        if resource:
-            cls.vcpus = resource.vcpus
-            cls.memory_mb = resource.memory_mb
-            cls.local_gb = resource.local_gb
-
-    def get_available_resource(self, nodename):
-        host_state = super(SchedulerFakeDriver, self)\
-                .get_available_resource(nodename)
-        host_state['disk_available_least'] = \
-                host_state['local_gb'] - host_state['local_gb_used']
-        return host_state
-
-
-fake_async_networkinfo = \
-    lambda *args, **kwargs: network_model.NetworkInfoAsyncWrapper(
-        lambda *args, **kwargs: network_model.NetworkInfo())
-
-
-fake_deallocate_networkinfo = lambda *args, **kwargs: None
-
-
-fake_check_requested_networks = lambda *args, **kwargs: 1
 
 
 def debug(*args, **kwargs):
@@ -100,72 +28,14 @@ def debug(*args, **kwargs):
 
 class BenchDriverScheduler(bases.BenchDriverBase):
     def __init__(self, meta, host_manager=None):
-        self.meta = meta
-        if self.meta.scheduler_type == "filter":
-            self.host_manager = "host_manager"
-            self.scheduler_driver = "filter_scheduler"
-        elif self.meta.scheduler_type == "caching":
-            self.host_manager = "host_manager"
-            self.scheduler_driver = "caching_scheduler"
-        elif self.meta.scheduler_type == "shared":
-            self.host_manager = "shared_host_manager"
-            self.scheduler_driver = "filter_scheduler"
-        else:
-            raise RuntimeError("Unsupported scheduler type: %s"
-                               % self.meta.scheduler_type)
-        self.resource = get_view(self.meta.v_type)
-        self.resource.hostname = self.meta.host
-        if meta.release not in ["mitaka+", "mitaka", "kilo", "proto"]:
-            raise RuntimeError("Unsupported release: %s" % meta.release)
-        self.release = meta.release
+        # TODO: handle releases in nova_patcher
+        self.release = Release[CONF_BENCH.nova_patcher.release]
         super(BenchDriverScheduler, self).__init__(meta)
-
-    def _stubout_nova(self):
-        resource_view = self.resource
-        SchedulerFakeDriver.prepare_resource(resource_view)
-        self.patch('nova.virt.fake.SchedulerFakeDriver',
-                   SchedulerFakeDriver,
-                   add=True)
-        self.patch('nova.compute.manager.ComputeManager._allocate_network',
-                   fake_async_networkinfo)
-        self.patch('nova.compute.manager.ComputeManager._deallocate_network',
-                   fake_deallocate_networkinfo)
-        self.patch('nova.compute.api.API._check_requested_networks',
-                   fake_check_requested_networks)
-
-    def _stubout_conf(self):
-        if self.release == "mitaka+":
-            self.conf("compute_driver",
-                      'fake.SchedulerFakeDriver')
-        else:
-            self.conf("compute_driver",
-                      'nova.virt.fake.SchedulerFakeDriver')
-
-        if self.release != "kilo":
-            self.conf("ram_allocation_ratio", self.resource.r_ratio)
-            self.conf("cpu_allocation_ratio", self.resource.c_ratio)
-            self.conf("disk_allocation_ratio", self.resource.d_ratio)
-            self.conf("scheduler_driver", self.scheduler_driver)
-            self.conf("scheduler_host_manager", self.host_manager)
-        self.conf("reserved_host_disk_mb", 0)
-        self.conf("reserved_host_memory_mb", 0)
-        self.conf("scheduler_max_attempts", 5)
-        self.conf("scheduler_default_filters",
-                  ["RetryFilter",
-                   "AvailabilityZoneFilter",
-                   "RamFilter",
-                   "DiskFilter",
-                   # "CoreFilter",
-                   "ComputeFilter",
-                   "ComputeCapabilitiesFilter",
-                   "ImagePropertiesFilter",
-                   "ServerGroupAntiAffinityFilter",
-                   "ServerGroupAffinityFilter"])
 
     def _inject_logs(self):
         # nova api part
         _from_create = lambda kwargs: kwargs['body']['server']['name']
-        if self.release == "kilo":
+        if self.release == Release.KILO:
             # there're two api entry points for "create"
             create_point = \
                 "nova.api.openstack.compute.servers.Controller.create"
@@ -219,7 +89,7 @@ class BenchDriverScheduler(bases.BenchDriverBase):
                     self.warn("%s attempts %s"
                               % (args[1], args[0]['retry']['num_attempts'])))
 
-        if self.release == "kilo":
+        if self.release == Release.KILO:
             _from_spec = \
                 lambda args: args[2]["instance_properties"]["uuid"]
         else:
@@ -227,8 +97,7 @@ class BenchDriverScheduler(bases.BenchDriverBase):
             _from_spec = lambda args: args[2].instance_uuid
 
         def _get_host(kwargs):
-            if self.host_manager == "shared_host_manager" \
-                    or self.release == "proto":
+            if self.release == Release.PROTOTYPE:
                 return kwargs['ret_val'][0][0]['host']
             else:
                 # mitaka, kilo
@@ -256,7 +125,7 @@ class BenchDriverScheduler(bases.BenchDriverBase):
                                  kwargs['node'])))
 
         # nova scheduler part
-        if self.release == "kilo":
+        if self.release == Release.PROTOTYPE:
             _from_spec_kw = \
                 lambda kwargs: \
                 kwargs['request_spec']['instance_properties']["uuid"]
@@ -293,7 +162,7 @@ class BenchDriverScheduler(bases.BenchDriverBase):
 
         # nova compute part
         c_m_patch = None
-        if self.release == "kilo":
+        if self.release == Release.KILO:
             c_m_patch = lambda *args, **kwargs: \
                 self.warn("%s received" % args[2].display_name)
         else:
