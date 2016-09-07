@@ -16,6 +16,7 @@ from openstack_bench.config import CONF_BENCH
 from openstack_bench import bench_drivers
 
 
+# TODO: remove meta
 class BenchmarkMeta(object):
     DEFAULT_HOST = "_local_"
 
@@ -34,5 +35,5 @@ def init(args):
     driver_class_name = CONF_BENCH.bench_driver
     driver_obj = bench_drivers.init_driver(driver_class_name, meta)
 
-    patch_engine = engine.PatchEngine(meta, driver_obj)
-    patch_engine.subvirt(args.service)
+    patch_engine = engine.PatchEngine(meta, driver_obj, args.service)
+    patch_engine.subvirt()

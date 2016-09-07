@@ -1,3 +1,9 @@
+import sys
+
+from nova.cmd import api
+from nova.cmd import compute
+from nova.cmd import conductor
+from nova.cmd import scheduler
 from nova.network import model as network_model
 from nova.virt import fake
 
@@ -89,3 +95,24 @@ class NovaPatcher(bases.BasePatcher):
                        "ImagePropertiesFilter",
                        "ServerGroupAntiAffinityFilter",
                        "ServerGroupAffinityFilter"])
+
+    def run_service(self, service_name):
+        sys.argv = [""]
+        sys.argv.append("--config-file")
+        sys.argv.append("/etc/nova/nova.conf")
+
+        service = service_name
+        if service == "compute":
+            sys.argv[0] = "nova-compute"
+            compute.main()
+        elif service == "conductor":
+            sys.argv[0] = "nova-conductor"
+            conductor.main()
+        elif service == "scheduler":
+            sys.argv[0] = "nova-scheduler"
+            scheduler.main()
+        elif service == "api":
+            sys.argv[0] = "nova-api"
+            api.main()
+        else:
+            raise RuntimeError("Unsupported service %s" % service)
