@@ -20,6 +20,24 @@ import openstack_bench.os_patcher.patching as bench_patching
 LOG = logging.getLogger(__name__)
 
 
+class AnalysisPoint(object):
+    BEFORE = object()
+    AFTER = object()
+    EXCEPT = object()
+
+    def __init__(self,
+                 inject_point,
+                 inject_place,
+                 f_build_msg,
+                 releases=None,
+                 except_type=None):
+        self.inject_point = inject_point
+        self.inject_place = inject_place
+        self.f_build_msg = f_build_msg
+        self.releases = releases
+        self.except_type = except_type
+
+
 class BenchDriverBase(object):
     def __init__(self, meta):
         self.meta = meta

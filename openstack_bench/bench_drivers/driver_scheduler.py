@@ -17,6 +17,7 @@ from openstack_bench.config import CONF_BENCH
 from openstack_bench.releases import Release
 
 import bases
+from bases import AnalysisPoint
 
 
 def debug(*args, **kwargs):
@@ -29,6 +30,55 @@ class BenchDriverScheduler(bases.BenchDriverBase):
         # TODO: handle releases in nova_patcher
         self.release = Release[CONF_BENCH.nova_patcher.release]
         super(BenchDriverScheduler, self).__init__(meta)
+
+    def register_points(self):
+        f_ins_name = lambda arg: arg['body']['server']['name']
+
+        self.register_point(
+            "nova.api.openstack.compute.servers.Controller.create",
+            before=lambda arg:
+                "%s received" % f_ins_name(arg),
+            after=lambda arg:
+                "%s api returned" % f_ins_name(arg),
+            excep=lambda arg:
+                "%s failed: %s" % (f_ins_name(arg), arg['exc_val']),
+            Release.KILO)
+
+        self.register_point(
+            "nova.api.openstack.compute.plugins.v3.servers.ServersController.create",
+            before=lambda arg:
+                "%s received" % f_ins_name(arg),
+            after=lambda arg:
+                "%s api returned" % f_ins_name(arg),
+            excep=lambda arg:
+                "%s failed: %s" % (f_ins_name(arg), arg['exc_val']),
+            Release.KILO)
+
+        self.register_point(
+            "nova.api.openstack.compute.servers.ServersController.create",
+            before=lambda arg:
+                "%s received" % f_ins_name(arg),
+            after=lambda arg:
+                "%s api returned" % f_ins_name(arg),
+            excep=lambda arg:
+                "%s failed: %s" % (f_ins_name(arg), arg['exc_val']),
+            [Release.MITAKA, Release.PROTOTYPE, Release.LATEST])
+
+        self.register_point(
+            "nova.conductor.rpcapi.ComputeTaskAPI.build_instances",
+            before=lambda arg:
+                "%s sent/retried" % arg['instances'][0].display_name)
+
+        self.register_point(
+            "nova.conductor.manager.ComputeTaskManager.build_instances",
+            before=lambda arg:
+                "%s,%s received" % (arg['instances'][0].display_name,
+                                    arg['instances'][0].uuid))
+
+        self.register_point(
+            "nova.scheduler.utils.populate_retry",
+            before=lambda arg:
+                "%s attempts %s")
 
     def _inject_logs(self):
         # nova api part
