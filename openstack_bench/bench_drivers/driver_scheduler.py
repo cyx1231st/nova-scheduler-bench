@@ -12,8 +12,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from nova import exception
-
 from openstack_bench.bench_drivers import register_driver
 from openstack_bench.config import CONF_BENCH
 from openstack_bench.releases import Release
@@ -34,20 +32,20 @@ class BenchDriverScheduler(bases.BenchDriverBase):
 
     def _inject_logs(self):
         # nova api part
-        _from_create = lambda kwargs: kwargs['body']['server']['name']
+        _from_create = lambda arg: arg['body']['server']['name']
         if self.release == Release.KILO:
             # there're two api entry points for "create"
             create_point = \
                 "nova.api.openstack.compute.servers.Controller.create"
             self.patch_aop(
                     create_point,
-                    before=lambda *args, **kwargs:
-                        self.warn("%s received" % _from_create(kwargs)),
-                    after=lambda *args, **kwargs:
-                        self.warn("%s failed: %s"
-                                  % (_from_create(kwargs), kwargs['exc_val']))
-                        if kwargs['exc_val'] else
-                        self.warn("%s api returned" % _from_create(kwargs)))
+                    before=lambda arg:
+                        self.warn("%s received" % _from_create(arg)),
+                    after=lambda arg:
+                        self.warn("%s failed: %r"
+                                  % (_from_create(arg), arg['exc_val']))
+                        if "exc_val" in arg else
+                        self.warn("%s api returned" % _from_create(arg)))
             create_point = \
                 "nova.api.openstack.compute.plugins.v3.servers.ServersController.create"
         else:
@@ -56,45 +54,45 @@ class BenchDriverScheduler(bases.BenchDriverBase):
                 "nova.api.openstack.compute.servers.ServersController.create"
         self.patch_aop(
                 create_point,
-                before=lambda *args, **kwargs:
-                    self.warn("%s received" % _from_create(kwargs)),
-                after=lambda *args, **kwargs:
-                    self.warn("%s failed: %s"
-                              % (_from_create(kwargs), kwargs['exc_val']))
-                    if kwargs['exc_val'] else
-                    self.warn("%s api returned" % _from_create(kwargs)))
+                before=lambda arg:
+                    self.warn("%s received" % _from_create(arg)),
+                after=lambda arg:
+                    self.warn("%s failed: %r"
+                              % (_from_create(arg), arg['exc_val']))
+                    if "exc_val" in arg else
+                    self.warn("%s api returned" % _from_create(arg)))
         self.patch_aop(
                 "nova.conductor.rpcapi.ComputeTaskAPI.build_instances",
-                before=lambda *args, **kwargs:
+                before=lambda arg:
                     self.warn("%s sent/retried"
-                              % kwargs['instances'][0].display_name))
+                              % arg['instances'][0].display_name))
 
         # nova conductor part
         self.patch_aop(
                 "nova.conductor.manager.ComputeTaskManager.build_instances",
-                before=lambda *args, **kwargs:
+                before=lambda arg:
                     self.warn("%s,%s received"
-                              % (kwargs['instances'][0].display_name,
-                                 kwargs['instances'][0].uuid)))
+                              % (arg['instances'][0].display_name,
+                                 arg['instances'][0].uuid)))
         self.patch_aop(
                 "nova.scheduler.utils.populate_retry",
-                after=lambda *args, **kwargs:
-                    self.warn("%s failed: attempt 1" % args[1])
-                    if kwargs['exc_val'] and 'retry' not in args[0] else
+                after=lambda arg:
+                    self.warn("%s failed: attempt 1" % arg["instance_uuid"])
+                    if "exc_val" in arg and 'retry' not in arg["filter_properties"] else
                     self.warn("%s failed: attempt %s"
-                              % (args[1], args[0]['retry']['num_attempts']))
-                    if kwargs['exc_val'] else
-                    self.warn("%s attempts 1" % args[1])
-                    if 'retry' not in args[0] else
+                              % (arg["instance_uuid"], arg["filter_properties"]['retry']['num_attempts']))
+                    if "exc_val" in arg else
+                    self.warn("%s attempts 1" % arg["instance_uuid"])
+                    if 'retry' not in arg["filter_properties"] else
                     self.warn("%s attempts %s"
-                              % (args[1], args[0]['retry']['num_attempts'])))
+                              % (arg["instance_uuid"], arg["filter_properties"]['retry']['num_attempts'])))
 
         if self.release == Release.KILO:
             _from_spec = \
-                lambda args: args[2]["instance_properties"]["uuid"]
+                lambda arg: arg["spec_obj"]["instance_properties"]["uuid"]
         else:
             # mitaka, proto
-            _from_spec = lambda args: args[2].instance_uuid
+            _from_spec = lambda arg: arg["spec_obj"].instance_uuid
 
         def _get_host(kwargs):
             if self.release == Release.PROTOTYPE:
@@ -103,72 +101,69 @@ class BenchDriverScheduler(bases.BenchDriverBase):
                 # mitaka, kilo
                 return kwargs['ret_val'][0]['host']
 
+        # TODO: except changed novalidhost
         self.patch_aop(
                 "nova.scheduler.rpcapi.SchedulerAPI.select_destinations",
-                before=lambda *args, **kwargs:
-                    self.warn("%s sent scheduler" % (_from_spec(args))),
-                after=lambda *args, **kwargs:
-                    self.warn("%s failed: novalidhost" % (_from_spec(args)))
-                    if isinstance(kwargs['exc_val'], exception.NoValidHost)
-                    else
-                    self.warn("%s failed: %s"
-                              % (_from_spec(args), kwargs['exc_val']))
-                    if kwargs['exc_val'] else
+                before=lambda arg:
+                    self.warn("%s sent scheduler" % (_from_spec(arg))),
+                after=lambda arg:
+                    self.warn("%s failed: %r"
+                              % (_from_spec(arg), arg['exc_val']))
+                    if "exc_val" in arg else
                     self.warn("%s decided %s"
-                              % (_from_spec(args),
-                                 _get_host(kwargs))))
+                              % (_from_spec(arg),
+                                 _get_host(arg))))
         self.patch_aop(
                 "nova.compute.rpcapi.ComputeAPI.build_and_run_instance",
-                before=lambda *args, **kwargs:
+                before=lambda arg:
                     self.warn("%s sent %s"
-                              % (kwargs['instance'].display_name,
-                                 kwargs['node'])))
+                              % (arg['instance'].display_name,
+                                 arg['node'])))
 
         # nova scheduler part
-        if self.release == Release.PROTOTYPE:
+        if self.release == Release.KILO:
             _from_spec_kw = \
-                lambda kwargs: \
-                kwargs['request_spec']['instance_properties']["uuid"]
+                lambda arg: \
+                arg['request_spec']['instance_properties']["uuid"]
         else:
             # mitaka, proto
-            _from_spec_kw = lambda kwargs: kwargs['spec_obj'].instance_uuid
+            _from_spec_kw = lambda arg: arg['spec_obj'].instance_uuid
         self.patch_aop(
                 "nova.scheduler.manager.SchedulerManager.select_destinations",
-                before=lambda *args, **kwargs:
-                    self.warn("%s received" % _from_spec_kw(kwargs)),
-                after=lambda *args, **kwargs:
-                    self.warn("%s failed: novalidhost"
-                              % _from_spec_kw(kwargs))
-                    if kwargs['exc_val'] else
+                before=lambda arg:
+                    self.warn("%s received" % _from_spec_kw(arg)),
+                after=lambda arg:
+                    self.warn("%s failed: %r"
+                              % (_from_spec_kw(arg), arg['exc_val']))
+                    if "exc_val" in arg else
                     self.warn("%s selected %s"
-                              % (_from_spec_kw(kwargs),
-                                 _get_host(kwargs))))
+                              % (_from_spec_kw(arg), _get_host(arg))))
         self.patch_aop(
                 "nova.scheduler.filter_scheduler.FilterScheduler._schedule",
-                before=lambda *args, **kwargs:
-                    self.warn("%s start scheduling" % _from_spec(args)),
-                after=lambda *args, **kwargs:
-                    self.warn("%s finish scheduling" % _from_spec(args)))
+                before=lambda arg:
+                    self.warn("%s start scheduling" % _from_spec(arg)),
+                after=lambda arg:
+                    self.warn("%s finish scheduling" % _from_spec(arg)))
         self.patch_aop(
                 "nova.scheduler.filter_scheduler."
                 "FilterScheduler._get_all_host_states",
-                before=lambda *args, **kwargs: self.warn("-- start_db"),
-                after=lambda *args, **kwargs: self.warn("-- finish_db"))
+                before=lambda arg: self.warn("-- start_db"),
+                after=lambda arg: self.warn("-- finish_db"))
         self.patch_aop(
                 "nova.scheduler.caching_scheduler."
                 "CachingScheduler._get_all_host_states",
-                before=lambda *args, **kwargs: self.warn("-- start_db"),
-                after=lambda *args, **kwargs: self.warn("-- finish_db"))
+                before=lambda arg: self.warn("-- start_db"),
+                after=lambda arg: self.warn("-- finish_db"))
 
         # nova compute part
         c_m_patch = None
         if self.release == Release.KILO:
-            c_m_patch = lambda *args, **kwargs: \
-                self.warn("%s received" % args[2].display_name)
+            c_m_patch = lambda arg: \
+                self.warn("%s received" % arg["instance"].display_name)
         else:
             # mitaka, proto
-            c_m_patch = lambda *args, **kwargs: \
-                self.warn("%s received" % kwargs['instance'].display_name)
+            c_m_patch = lambda arg: \
+                self.warn("%s received" % arg['instance'].display_name)
 
         self.patch_aop(
                 "nova.compute.manager.ComputeManager.build_and_run_instance",
@@ -176,17 +171,16 @@ class BenchDriverScheduler(bases.BenchDriverBase):
         self.patch_aop(
                 "nova.compute.manager.ComputeManager."
                 "_do_build_and_run_instance",
-                after=lambda *args, **kwargs:
+                after=lambda arg:
                     self.warn("%s finished: %s"
-                              % (args[2].display_name, kwargs['ret_val'])))
+                              % (arg["instance"].display_name, arg['ret_val'])))
+        # TODO: except changed retry
         self.patch_aop(
                 "nova.compute.manager.ComputeManager._build_and_run_instance",
-                after=lambda *args, **kwargs:
-                    self.warn("%s fail: retry" % args[2].display_name)
-                    if isinstance(kwargs['exc_val'], exception.RescheduledException) else
-                    self.warn("%s fail: %s" % (args[2].display_name, kwargs['exc_val']))
-                    if kwargs['exc_val'] is not None else
-                    self.warn("%s success" % args[2].display_name))
+                after=lambda arg:
+                    self.warn("%s fail: %r" % (arg["instance"].display_name, arg['exc_val']))
+                    if "exc_val" in arg else
+                    self.warn("%s success" % arg["instance"].display_name))
         """
         self.patch_aop(
                 "nova.compute.claims.Claim._claim_test",

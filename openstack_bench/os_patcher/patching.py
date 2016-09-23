@@ -11,41 +11,82 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import inspect
+import traceback
 
 
 class AopPatch(object):
+    error_prefix = "AOP_PATCH_ERROR"
     logger = None
+    exc_key = "exc_val"
+    ret_key = "ret_val"
+
+    def _handle_error(self, e, place, arg_dict):
+        e_stack = traceback.format_exc()
+        self.logger(self.error_prefix + (" @%s " % place) + str(e))
+        self.logger(self.error_prefix + " " + str(arg_dict.keys()))
+        self.logger(self.error_prefix + " " + repr(arg_dict))
+        self.logger(self.error_prefix + " " + e_stack)
 
     def aop_wrapper(self, func):
+        # Getting real signature of the decorated function
+        # This looks ugly becouse some of the decorators don't preserve the
+        # original signature, which is bad for variable name introspection
+        # TODO: Need to find a better way to introspect variable names
+        inspected = func
+        while True:
+            # NOTE: python 3 uses __closure__ instead
+            inspected_closure = inspected.func_closure
+            if inspected_closure is None:
+                break
+            found = False
+            for closure in inspected_closure:
+                c_content = closure.cell_contents
+                if inspect.isfunction(c_content):
+                    inspected = c_content
+                    found = True
+                    break
+            if not found:
+                break
+        func_varnames = inspected.func_code.co_varnames
+
         def aop_wrapped(*args, **kwargs):
+            # NOTE(Yingxin): It doesn't handle default arguments.
+            arg_dict = {}
+            arg_dict.update(kwargs)
+
+            for key, item in zip(func_varnames, args):
+                arg_dict[key] = item
+
             if self.before:
                 try:
-                    self.before(*args, **kwargs)
+                    self.before(arg_dict)
                 except Exception as e:
-                    self.logger(str(e))
-                    self.logger("args: %s" % repr(args))
-                    self.logger("kwargs: %s" % repr(kwargs))
-                    raise
+                    self._handle_error(e, "BEFORE", arg_dict)
             try:
                 ret = func(*args, **kwargs)
             except Exception as e:
                 if self.after:
+                    if self.exc_key in arg_dict:
+                        self.logger(self.error_prefix + " %s key confliction!"
+                                    % self.exc_key)
+                    else:
+                        arg_dict[self.exc_key] = e
                     try:
-                        self.after(ret_val=None, exc_val=e, *args, **kwargs)
+                        self.after(arg_dict)
                     except Exception as e:
-                        self.logger(str(e))
-                        self.logger("args: %s" % repr(args))
-                        self.logger("kwargs: %s" % repr(kwargs))
-                        raise
+                        self._handle_error(e, "EXCEPT", arg_dict)
                 raise
             if self.after:
+                if self.ret_key in arg_dict:
+                    self.logger(self.error_prefix + " %s key confliction!"
+                                % self.ret_key)
+                else:
+                    arg_dict[self.ret_key] = ret
                 try:
-                    self.after(ret_val=ret, exc_val=None, *args, **kwargs)
+                    self.after(arg_dict)
                 except Exception as e:
-                    self.logger(str(e))
-                    self.logger("args: %s" % repr(args))
-                    self.logger("kwargs: %s" % repr(kwargs))
-                    raise
+                    self._handle_error(e, "AFTER", arg_dict)
             return ret
         return aop_wrapped
 
@@ -74,10 +115,14 @@ class MonkeyPatch(object):
         old_value = getattr(current, attribute, sentinel)
         if not add:
             if old_value is sentinel:
-                raise RuntimeError("Cannot find method: %s" % name)
+                err_msg = "Cannot find method: %s" % name
+                AopPatch.logger(AopPatch.error_prefix + " " + err_msg)
+                raise RuntimeError(err_msg)
         else:
             if old_value is not sentinel:
-                raise RuntimeError("Method already exists: %s" % name)
+                err_msg = "Method already exists: %s" % name
+                AopPatch.logger(AopPatch.error_prefix + " " + err_msg)
+                raise RuntimeError(err_msg)
 
         self.attribute = attribute
         self.old_value = old_value

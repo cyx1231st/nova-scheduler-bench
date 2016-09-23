@@ -299,9 +299,9 @@ class Diagram(object):
                        10)
         node11 = build(node10, diag.sched, "scheduler", True, "selected",
                        11)
-        node12 = build(node10, diag.sched, "scheduler", True, "failed: novalidhost",
+        node12 = build(node10, diag.sched, "scheduler", True, "failed:",
                        12)
-        node22 = build(node12, diag.cond2, "conductor", True, "failed: novalidhost",
+        node22 = build(node12, diag.cond2, "conductor", True, "failed: NoValidHost",
                        22, True)
         node13 = build(node11, diag.cond2, "conductor", True, "decided",
                        13)
@@ -313,7 +313,7 @@ class Diagram(object):
                        24)
         node25 = build(node24, diag.comp, "compute", True, "finished: active",
                        25, True)
-        node16 = build(node15, diag.comp, "compute", True, "fail: retry",
+        node16 = build(node15, diag.comp, "compute", True, "fail: Rescheduled",
                        16)
         node23 = build(node15, diag.comp, "compute", True, "fail:",
                        23, True)
@@ -637,6 +637,9 @@ class RequestStateMachine(object):
     """
 
     def check(self):
+        if self.state is self.ERROR:
+            print(self.state_msg)
+            return
         ps = self.paces[1]
         prv_log = ps.log
         prv = prv_log.seconds
