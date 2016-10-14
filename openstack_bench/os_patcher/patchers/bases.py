@@ -14,6 +14,8 @@ def printerror(error_str):
 
 
 class BasePatcher(object):
+    """ BasePatcher for OpenStack projects """
+
     __metaclass__ = abc.ABCMeta
 
     REPOSITORY = _UNDFINED
@@ -23,6 +25,7 @@ class BasePatcher(object):
     def __init__(self, service_name, host_name, release=None):
         self.release = release
         self.service_name = service_name
+        self.host_name = host_name
         self.log_prefix = "BENCH-" + service_name + "-" + host_name + ": "
 
     def stub_entrypoint(self, patch_func):
@@ -39,16 +42,50 @@ class BasePatcher(object):
         """ Stub out repository modules """
 
     @abc.abstractmethod
-    def override_configurations(self):
+    def _override_configurations(self):
         """ Stub out repository configurations """
 
-    def inject_logs(self, points):
+    def override_configurations(self, is_console, is_debug, folder):
+        """ Stub out repository configurations """
+        self.conf("host", self.host_name)
+
+        # Enable console mode
+        if not is_console:
+            self.conf(
+                "logging_default_format_string",
+                "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [-] "
+                "%(instance)s%(message)s")
+            self.conf(
+                "logging_debug_format_suffix",
+                "from (pid=%(process)d) %(funcName)s "
+                "%(pathname)s:%(lineno)d")
+            self.conf(
+                "logging_exception_prefix",
+                "%(asctime)s.%(msecs)03d TRACE %(name)s %(instance)s")
+            self.conf(
+                "logging_context_format_string",
+                "%(asctime)s.%(msecs)03d %(levelname)s %(name)s "
+                "[%(request_id)s %(user_name)s %(project_name)s] "
+                "%(instance)s%(message)s")
+            self.conf(
+                "log_file",
+                folder + "BENCH-" + self.service_name + "-"
+                + self.host_name + ".log")
+
+        # Enable debug mode
+        self.conf("debug", is_debug)
+
+        # Custom overriding
+        self._override_configurations()
+
+    def inject_logs(self, points, engine):
         bench_patching.AopPatch.logger = staticmethod(self.error)
         bench_patching.AopPatch.printer = staticmethod(self.printer)
 
+        # TODO: report status
         bench_patching.AopPatch(
             "oslo_log.log.setup",
-            after=lambda arg: "Bench initiated!")
+            after=lambda arg: "Bench initiated %s!" % engine.subvirted)
 
         for point in points:
             if point.project != self.REPOSITORY:
@@ -71,6 +108,7 @@ class BasePatcher(object):
             except Exception:
                 self.printer("Failed to load %s!" % point.inject_point)
 
+    # helper methods
     def patch(self, name, attr, add=False):
         """ Patch module name with attr """
         bench_patching.MonkeyPatch(name, attr, add=add)

@@ -15,7 +15,8 @@
 import argparse
 import socket
 
-import bench
+import engine
+import patchers
 
 
 def main():
@@ -28,13 +29,19 @@ def main():
     parser.add_argument('--host',
                         default=socket.gethostname(),
                         help="If set, service will be started using this "
-                             "hostname instead of machine name. Used for "
-                             "start parallel services in the same host.")
+                             "hostname instead of machine name: %s. Used for "
+                             "start parallel services in the same host."
+                             % socket.gethostname())
     parser.add_argument('--result-folder',
                         default=".",
                         help="If set, the logs will be in that folder.")
     parser.add_argument("service",
-                        help="Launched nova service type: compute, api, "
-                        "scheduler, conductor.")
+                        help="Launched nova service type: %s."
+                             % patchers.available_services())
     args = parser.parse_args()
-    bench.init(args)
+
+    if not args.result_folder.endswith("/"):
+        args.result_folder = args.result_folder + "/"
+
+    patch_engine = engine.PatchEngine(args)
+    patch_engine.subvirt()

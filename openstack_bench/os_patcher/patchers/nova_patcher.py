@@ -16,9 +16,11 @@ from openstack_bench.releases import Release
 
 
 class _SchedulerFakeDriver(fake.FakeDriver):
-    vcpus = CONF_BENCH.nova_patcher.vcpus
-    memory_mb = CONF_BENCH.nova_patcher.memory_mb
-    local_gb = CONF_BENCH.nova_patcher.disk_gb
+    @classmethod
+    def setup(cls):
+        cls.vcpus = CONF_BENCH.nova_patcher.vcpus
+        cls.memory_mb = CONF_BENCH.nova_patcher.memory_mb
+        cls.local_gb = CONF_BENCH.nova_patcher.disk_gb
 
     def get_available_resource(self, nodename):
         host_state = super(_SchedulerFakeDriver, self)\
@@ -42,6 +44,7 @@ class NovaPatcher(bases.BasePatcher):
         # NOTE: if simulation mode is enabled, the virt driver will be replaced
         # by a fake driver.
         if CONF_BENCH.nova_patcher.enable_simulation:
+            _SchedulerFakeDriver.setup()
             self.patch('nova.virt.fake.SchedulerFakeDriver',
                        _SchedulerFakeDriver,
                        add=True)
@@ -58,7 +61,7 @@ class NovaPatcher(bases.BasePatcher):
             self.patch('nova.compute.api.API._check_requested_networks',
                        fake_check_requested_networks)
 
-    def override_configurations(self):
+    def _override_configurations(self):
         if CONF_BENCH.nova_patcher.enable_simulation:
             if self.release == Release.LATEST:
                 self.conf("compute_driver",
