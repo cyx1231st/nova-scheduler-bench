@@ -1,7 +1,24 @@
+# Copyright (c) 2016 Yingxin Cheng
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+
 import abc
+import traceback
 
 from oslo_log import log as logging
 
+from openstack_bench import interceptions
 from openstack_bench.os_patcher import patching as bench_patching
 
 
@@ -27,6 +44,10 @@ class BasePatcher(object):
         self.service_name = service_name
         self.host_name = host_name
         self.log_prefix = "BENCH-" + service_name + "-" + host_name + ": "
+
+        self.skipped = ""
+        self.patched = ""
+        self.failed = ""
 
     def stub_entrypoint(self, patch_func):
         if self.PATCH_POINT == _UNDFINED:
@@ -82,12 +103,27 @@ class BasePatcher(object):
         bench_patching.AopPatch.logger = staticmethod(self.error)
         bench_patching.AopPatch.printer = staticmethod(self.printer)
 
-        # TODO: report status
-        bench_patching.AopPatch(
-            "oslo_log.log.setup",
-            after=lambda arg: "Bench initiated %s!" % engine.subvirted)
+        i_point = interceptions.ReleasePoint(
+            after=lambda arg:
+                "Bench initiated %s %s!\n"
+                "Errors:\n%s\n"
+                "Patched:\n%s"
+                "Skipped:\n%s"
+                "Failed:\n%s" % (
+                    self.release,
+                    engine.subvirted,
+                    engine.errors,
+                    self.patched,
+                    self.skipped,
+                    self.failed))
+        point = interceptions.AnalysisPoint("oslo_log.log.setup",
+                                            project=self.REPOSITORY)
+        point[None] = i_point
 
-        for point in points:
+        _points = points[:]
+        _points.append(point)
+
+        for point in _points:
             if point.project != self.REPOSITORY:
                 raise RuntimeError("Project don't match: %s, %s"
                                    % (point.project, self.REPOSITORY))
@@ -97,16 +133,21 @@ class BasePatcher(object):
             elif None in point:
                 i_point = point[None]
             else:
-                self.printer("Skip point %s" % point.inject_point)
+                print("Skip point %s" % point.inject_point)
+                self.skipped += "   %s\n" % point.inject_point
                 continue
             try:
                 bench_patching.AopPatch(point.inject_point,
                                         before=i_point.before,
                                         after=i_point.after,
                                         excep=i_point.excep)
-                self.printer("Load point %s" % point.inject_point)
+                print("Load point %s" % point.inject_point)
+                self.patched += "   %s\n" % point.inject_point
             except Exception:
-                self.printer("Failed to load %s!" % point.inject_point)
+                e_stack = traceback.format_exc()
+                print("Failed to load %s!" % point.inject_point)
+                print("Traceback:\n%s" % e_stack)
+                self.failed += "   %s\n" % point.inject_point
 
     # helper methods
     def patch(self, name, attr, add=False):

@@ -12,47 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from oslo_log import log as logging
-
-
-LOG = logging.getLogger(__name__)
-
-
-class AnalysisPoint(object):
-    def __init__(self,
-                 inject_point,
-                 project=None):
-        self.inject_point = inject_point
-        self._release_points = {}
-        if not project:
-            self.project = inject_point.split(".")[0]
-        else:
-            self.project = project
-
-    def __getitem__(self, key):
-        return self._release_points[key]
-
-    def __setitem__(self, key, item):
-        if not isinstance(key, list):
-            key = [key]
-        for k in key:
-            if k in self._release_points:
-                raise RuntimeError("AnalysisPoint %s already registered %s!"
-                                   % (self.inject_point, k))
-            else:
-                self._release_points[k] = item
-
-    def __contains__(self, key):
-        return key in self._release_points
-
-
-class ReleasePoint(object):
-    def __init__(self, before, after, excep):
-        if not before and not after and not excep:
-            raise RuntimeError()
-        self.before = before
-        self.after = after
-        self.excep = excep
+from openstack_bench import interceptions
 
 
 class BenchDriverBase(object):
@@ -67,8 +27,8 @@ class BenchDriverBase(object):
     def register_point(self, place, before=None,
                        after=None, excep=None, release=None):
         point = self.points.get(place)
-        r_point = ReleasePoint(before, after, excep)
+        r_point = interceptions.ReleasePoint(before, after, excep)
         if not point:
-            point = AnalysisPoint(place)
+            point = interceptions.AnalysisPoint(place)
             self.points[place] = point
         point[release] = r_point

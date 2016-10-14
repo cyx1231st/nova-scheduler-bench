@@ -24,7 +24,8 @@ class AopPatch(object):
 
     def _handle_error(self, e, place, arg_dict):
         e_stack = traceback.format_exc()
-        self.logger(self.error_prefix + (" %s@%s " % (self.name, place)) + str(e))
+        self.logger(self.error_prefix +
+                    (" %s@%s " % (self.name, place)) + str(e))
         self.logger(self.error_prefix + " " + str(arg_dict.keys()))
         self.logger(self.error_prefix + " " + repr(arg_dict))
         self.logger(self.error_prefix + " " + e_stack)
