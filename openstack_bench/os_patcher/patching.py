@@ -18,12 +18,13 @@ import traceback
 class AopPatch(object):
     error_prefix = "AOP_PATCH_ERROR"
     logger = None
+    printer = None
     exc_key = "exc_val"
     ret_key = "ret_val"
 
     def _handle_error(self, e, place, arg_dict):
         e_stack = traceback.format_exc()
-        self.logger(self.error_prefix + (" @%s " % place) + str(e))
+        self.logger(self.error_prefix + (" %s@%s " % (self.name, place)) + str(e))
         self.logger(self.error_prefix + " " + str(arg_dict.keys()))
         self.logger(self.error_prefix + " " + repr(arg_dict))
         self.logger(self.error_prefix + " " + e_stack)
@@ -60,20 +61,26 @@ class AopPatch(object):
 
             if self.before:
                 try:
-                    self.before(arg_dict)
+                    if self.direct:
+                        self.before(arg_dict)
+                    else:
+                        self.printer(self.before(arg_dict))
                 except Exception as e:
                     self._handle_error(e, "BEFORE", arg_dict)
             try:
                 ret = func(*args, **kwargs)
             except Exception as e:
-                if self.after:
+                if self.excep:
                     if self.exc_key in arg_dict:
                         self.logger(self.error_prefix + " %s key confliction!"
                                     % self.exc_key)
                     else:
                         arg_dict[self.exc_key] = e
                     try:
-                        self.after(arg_dict)
+                        if self.direct:
+                            self.excep(arg_dict)
+                        else:
+                            self.printer(self.excep(arg_dict))
                     except Exception as e:
                         self._handle_error(e, "EXCEPT", arg_dict)
                 raise
@@ -84,16 +91,22 @@ class AopPatch(object):
                 else:
                     arg_dict[self.ret_key] = ret
                 try:
-                    self.after(arg_dict)
+                    if self.direct:
+                        self.after(arg_dict)
+                    else:
+                        self.printer(self.after(arg_dict))
                 except Exception as e:
                     self._handle_error(e, "AFTER", arg_dict)
             return ret
         return aop_wrapped
 
-    def __init__(self, name, before=None, after=None):
+    def __init__(self, name,
+                 before=None, after=None, excep=None, direct=False):
         self.name = name
         self.before = before
         self.after = after
+        self.excep = excep
+        self.direct = direct
         self.patching = MonkeyPatch(name, self.aop_wrapper, wrap=True)
 
     def clean(self):

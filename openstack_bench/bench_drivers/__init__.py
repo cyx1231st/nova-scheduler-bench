@@ -28,8 +28,8 @@ def get_driver_names():
     return _AVAILABLE_DRIVERS.keys()
 
 
-def init_driver(name, meta):
-    return _AVAILABLE_DRIVERS[name](meta)
+def init_driver(name):
+    return _AVAILABLE_DRIVERS[name]()
 
 
 def _register_all():

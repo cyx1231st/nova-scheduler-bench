@@ -14,58 +14,61 @@
 
 from oslo_log import log as logging
 
-import openstack_bench.os_patcher.patching as bench_patching
-
 
 LOG = logging.getLogger(__name__)
 
 
 class AnalysisPoint(object):
-    BEFORE = object()
-    AFTER = object()
-    EXCEPT = object()
-
     def __init__(self,
                  inject_point,
-                 inject_place,
-                 f_build_msg,
-                 releases=None,
-                 except_type=None):
+                 project=None):
         self.inject_point = inject_point
-        self.inject_place = inject_place
-        self.f_build_msg = f_build_msg
-        self.releases = releases
-        self.except_type = except_type
+        self._release_points = {}
+        if not project:
+            self.project = inject_point.split(".")[0]
+        else:
+            self.project = project
+
+    def __getitem__(self, key):
+        return self._release_points[key]
+
+    def __setitem__(self, key, item):
+        if not isinstance(key, list):
+            key = [key]
+        for k in key:
+            if k in self._release_points:
+                raise RuntimeError("AnalysisPoint %s already registered %s!"
+                                   % (self.inject_point, k))
+            else:
+                self._release_points[k] = item
+
+    def __contains__(self, key):
+        return key in self._release_points
+
+
+class ReleasePoint(object):
+    def __init__(self, before, after, excep):
+        if not before and not after and not excep:
+            raise RuntimeError()
+        self.before = before
+        self.after = after
+        self.excep = excep
 
 
 class BenchDriverBase(object):
-    def __init__(self, meta):
-        self.meta = meta
+    def __init__(self):
+        self.release = None
+        self.points = {}
+        self.register_points()
 
-    def _inject_logs(self):
+    def register_points(self):
         raise NotImplementedError()
 
-    def inject_logs(self):
-        bench_patching.AopPatch.logger = self.error
-        self.patch_aop(
-            "oslo_log.log.setup",
-            after=lambda *args, **kwargs:
-                self.warn("Bench initiated!"))
-        self._inject_logs()
-
-    # patchings
-    def patch_aop(self, name, before=None, after=None):
-        bench_patching.AopPatch(name, before=before, after=after)
-
-    # loggers
-    def info(self, msg):
-        LOG.info(self.meta.log_prefix + msg)
-
-    def debug(self, msg):
-        LOG.debug(self.meta.log_prefix + msg)
-
-    def warn(self, msg):
-        LOG.warn(self.meta.log_prefix + msg)
-
-    def error(self, msg):
-        LOG.error(self.meta.log_prefix + msg)
+    def register_point(self, place, before=None,
+                       after=None, excep=None, release=None):
+        point = self.points.get(place)
+        r_point = ReleasePoint(before, after, excep)
+        if not point:
+            point = AnalysisPoint(place)
+            self.points[place] = point
+        point[release] = r_point

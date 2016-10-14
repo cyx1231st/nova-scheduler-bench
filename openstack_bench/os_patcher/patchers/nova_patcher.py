@@ -32,10 +32,11 @@ class NovaPatcher(bases.BasePatcher):
     REPOSITORY = "nova"
     PATCH_POINT = "nova.config.parse_args"
     CONF = cfg.CONF
+    SERVICES = set(["compute", "conductor", "api", "scheduler"])
 
-    def __init__(self):
+    def __init__(self, service_name, host_name):
         release = Release[CONF_BENCH.nova_patcher.release]
-        super(NovaPatcher, self).__init__(release)
+        super(NovaPatcher, self).__init__(service_name, host_name, release)
 
     def stub_out_modules(self):
         # NOTE: if simulation mode is enabled, the virt driver will be replaced
@@ -96,12 +97,12 @@ class NovaPatcher(bases.BasePatcher):
                        "ServerGroupAntiAffinityFilter",
                        "ServerGroupAffinityFilter"])
 
-    def run_service(self, service_name):
+    def run_service(self):
         sys.argv = [""]
         sys.argv.append("--config-file")
         sys.argv.append("/etc/nova/nova.conf")
 
-        service = service_name
+        service = self.service_name
         if service == "compute":
             sys.argv[0] = "nova-compute"
             compute.main()

@@ -13,6 +13,7 @@
 # under the License.
 
 import argparse
+import socket
 
 import bench
 
@@ -25,7 +26,7 @@ def main():
                         help="Colored console logs during run without "
                              "log files, used for screen.")
     parser.add_argument('--host',
-                        default=bench.BenchmarkMeta.DEFAULT_HOST,
+                        default=socket.gethostname(),
                         help="If set, service will be started using this "
                              "hostname instead of machine name. Used for "
                              "start parallel services in the same host.")

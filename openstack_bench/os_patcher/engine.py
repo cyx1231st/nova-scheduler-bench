@@ -1,4 +1,4 @@
-from patchers.nova_patcher import NovaPatcher
+from patchers import load_patcher
 
 
 def printerror(error_str):
@@ -9,19 +9,24 @@ class PatchEngine(object):
     def __init__(self, meta, driver_obj, service_name):
         self.meta = meta
         self.driver_obj = driver_obj
-        # TODO: service discovery and no alias
+
         self.service_name = service_name
-        # TODO: build patcher from driver
-        self.patcher = NovaPatcher()
+
+        self.patcher = load_patcher(self.service_name, self.meta.host)
+        self.driver_obj.release = self.patcher.release
+        self.subvirted = False
 
     def _apply_patch(self):
+        if self.subvirted:
+            raise RuntimeError("Already subvirted!")
+        self.subvirted = True
+
         self.patcher.stub_out_modules()
 
-        # Replace host if DEFAULT_HOST not set
-        if self.meta.host and self.meta.host != self.meta.DEFAULT_HOST:
-            self.patcher.conf("host", self.meta.host)
+        self.patcher.conf("host", self.meta.host)
 
         # Enable console mode
+        # TODO: move it to BasePatcher
         if not self.meta.is_console:
             self.patcher.conf(
                 "logging_default_format_string",
@@ -50,9 +55,10 @@ class PatchEngine(object):
         # Patch repository specific configurations
         self.patcher.override_configurations()
 
-        # TODO: Inject logs using patcher
-        self.driver_obj.inject_logs()
+        # Inject logs dynamically
+        points = self.driver_obj.points.values()
+        self.patcher.inject_logs(points)
 
     def subvirt(self):
         self.patcher.stub_entrypoint(self._apply_patch)
-        self.patcher.run_service(self.service_name)
+        self.patcher.run_service()
