@@ -3,7 +3,7 @@ import os
 from os import path
 
 # TODO: extract the logics of emitting and parsing logging fields (low
-# priority)
+# priority), splitted by @-@
 
 
 class LogLine(object):
@@ -69,6 +69,7 @@ class LogLine(object):
 
         # correct, ident
         self.correct = True
+        # TODO
         self.ident = None
         self.prv = None
         self.nxt = None
@@ -261,13 +262,10 @@ class LogFile(object):
 
 class LogCollector(object):
     def __init__(self, log_folder, driver_obj):
-        self.api = {}
-        self.conductor = {}
-        self.schedulers = {}
-        self.computes = {}
         self.log_files = []
 
         self.relation = {}
+        self.service_host_dict = collections.defaultdict(dict)
 
         # current_path = path.dirname(os.path.realpath(__file__))
         current_path = os.getcwd()
@@ -284,46 +282,25 @@ class LogCollector(object):
             if not f.startswith("BENCH"):
                 continue
             f = LogFile(f, file_dir, self.relation)
-            if f.service == "api":
-                if f.host not in self.api:
-                    self.api[f.host] = f
+            if driver_obj.check_service(f.service):
+                if f.host not in self.service_host_dict[f.service]:
+                    self.service_host_dict[f.service][f.host] = f
                     self.log_files.append(f)
                 else:
-                    raise RuntimeError("There's already a log for api: %s, "
-                                       "but there is another one: %s"
-                                       % (self.api[f.host].name, f.name))
-
-            elif f.service == "conductor":
-                if f.host not in self.conductor:
-                    self.conductor[f.host] = f
-                    self.log_files.append(f)
-                else:
-                    raise RuntimeError("There's already a log for conductor: "
-                                       "%s, but there is another one: %s"
-                                       % (self.conductor[f.host].name, f.name))
-            elif f.service == "scheduler":
-                if f.host not in self.schedulers:
-                    self.schedulers[f.host] = f
-                    self.log_files.append(f)
-                else:
-                    raise RuntimeError("There's already a log for scheduler: "
-                                       "%s, but there is another one: %s" %
-                                       (self.schedulers[f.host].name, f.name))
-            elif f.service == "compute":
-                if f.host not in self.computes:
-                    self.computes[f.host] = f
-                    self.log_files.append(f)
-                else:
-                    raise RuntimeError("There's already a log for compute: "
-                                       "%s, but there is another one: %s" %
-                                       (self.computes[f.host].name, f.name))
+                    raise RuntimeError(
+                        "There's already a log for service "
+                        "%s: %s, but there is another one: %s"
+                        % (f.service,
+                           self.service_host_dict[f.service][f.host].name,
+                           f.name))
             else:
                 if f.log_lines:
                     raise RuntimeError("Unrecognized service %s for file %s" %
                                        (f.service, f.name))
-        if not self.api or not self.conductor or not self.schedulers \
-                or not self.computes:
-            raise RuntimeError("Incomplete log files.")
+        if driver_obj.SERVICES != set(self.service_host_dict.keys()):
+            raise RuntimeError("Incompatible log files, expected %s, but %s."
+                               % (driver_obj.SERVICES,
+                                  self.service_host_dict.keys()))
 
     def process_logs(self):
         name_errors = set()
@@ -348,30 +325,3 @@ class LogCollector(object):
             lf.catg_logs(name_errors, mismatch_errors)
 
         return name_errors, mismatch_errors
-
-    def emit_logs(self):
-        controller_logs = collections.defaultdict(list)
-        compute_logs = self.computes
-
-        active_schedulers, active_computes = 0, 0
-
-        for api in self.api.values():
-            for key, values in api.logs_by_ins.items():
-                controller_logs[key].extend(values)
-        for cond in self.conductor.values():
-            for key, values in cond.logs_by_ins.items():
-                controller_logs[key].extend(values)
-        for sche in self.schedulers.values():
-            if sche.logs_by_ins:
-                active_schedulers += 1
-                for key, values in sche.logs_by_ins.items():
-                    controller_logs[key].extend(values)
-        for logs in controller_logs.values():
-            logs.sort(key=lambda item: item.seconds)
-
-        for comp in self.computes.values():
-            if comp.logs_by_ins:
-                active_computes += 1
-
-        return controller_logs, compute_logs,\
-            active_schedulers, active_computes

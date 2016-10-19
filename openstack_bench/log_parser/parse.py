@@ -373,7 +373,6 @@ class RequestStateMachine(object):
                                      % (host, (lo, hi))
                     return
             else:
-                import pdb; pdb.set_trace()
                 self.state = self.ERROR
                 self.state_msg = "compute log cannot fit to mid:\n %s" % logs
                 return
@@ -1092,8 +1091,25 @@ def main():
 
     log_collector = LogCollector(args.folder, driver_obj)
     name_errors, mismatch_errors = log_collector.process_logs()
-    controller_logs, compute_logs, active_schedulers, active_computes =\
-        log_collector.emit_logs()
+
+    # TODO: remove this
+    service_host_logs = log_collector.service_host_dict
+    controller_logs = collections.defaultdict(list)
+    compute_logs = service_host_logs["compute"]
+    for service in ["api", "conductor", "scheduler"]:
+        for host_logs in service_host_logs[service].values():
+            for host, logs in host_logs.logs_by_ins.items():
+                controller_logs[host].extend(logs)
+    for logs in controller_logs.values():
+        logs.sort(key=lambda item: item.seconds)
+
+    active_schedulers, active_computes = 0, 0
+    for sche in service_host_logs["scheduler"].values():
+        if sche.logs_by_ins:
+            active_schedulers += 1
+    for comp in service_host_logs["compute"].values():
+        if comp.logs_by_ins:
+            active_computes += 1
 
     graph = Diagram()
     
