@@ -70,6 +70,8 @@ class LogLine(object):
         # correct, ident
         self.correct = True
         self.ident = None
+        self.prv = None
+        self.nxt = None
 
     def __repr__(self):
         return str(self.seconds) + " " + \
@@ -106,11 +108,11 @@ class LogLine(object):
             return False
         return True
 
-    def apply(self, relation_id, relation_name, log_lines, i):
+    def apply(self, relation_id, relation_name):
         if self.instance_id == "?" and self.instance_name == "?":
             if "start_db" in self.action:
-                if "start scheduling" in log_lines[i-1].action:
-                    self.instance_id = log_lines[i-1].instance_id
+                if "start scheduling" in self.prv.action:
+                    self.instance_id = self.prv.instance_id
                     if self.instance_id == "?":
                         raise RuntimeError("Cannot parse relation start_db!")
                 else:
@@ -118,8 +120,8 @@ class LogLine(object):
                           % self.get_line())
                     raise RuntimeError("Cannot parse relation start_db!")
             elif "finish_db" in self.action:
-                if "finish scheduling" in log_lines[i+1].action:
-                    self.instance_id = log_lines[i+1].instance_id
+                if "finish scheduling" in self.nxt.action:
+                    self.instance_id = self.nxt.instance_id
                     if self.instance_id == "?":
                         raise RuntimeError("Cannot parse relation finish_db!")
                 else:
@@ -183,6 +185,7 @@ class LogFile(object):
         self.hi = None
 
         with open(log_file, 'r') as reader:
+            prv = None
             for line in reader:
                 if "BENCH-" not in line:
                     continue
@@ -194,6 +197,11 @@ class LogFile(object):
                           % (lg, self.name))
                     return
                 self.log_lines.append(lg)
+                # link the logs
+                if prv is not None:
+                    prv.nxt = lg
+                    lg.prv = prv
+                prv = lg
 
     def set_offset(self, lo, hi):
         if lo is not None:
@@ -225,9 +233,8 @@ class LogFile(object):
 
     def apply_relation(self, relation, relation_name):
         mismatch_errors = set()
-        for i in range(0, len(self.log_lines)):
-            ret = self.log_lines[i].apply(relation, relation_name,
-                                          self.log_lines, i)
+        for line in self.log_lines:
+            ret = line.apply(relation, relation_name)
             if ret is not True and len(ret) == 36:
                 mismatch_errors.add(ret)
                 # self.log_lines[i].correct = False
