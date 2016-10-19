@@ -14,7 +14,6 @@
 
 import traceback
 
-from openstack_bench.config import CONF_BENCH
 from openstack_bench import bench_drivers
 from patchers import load_patcher
 
@@ -29,9 +28,11 @@ class PatchEngine(object):
 
         self.patcher = load_patcher(args.service, args.host)
 
-        driver_class_name = CONF_BENCH.bench_driver
-        self.driver_obj = bench_drivers.init_driver(driver_class_name)
+        self.driver_obj = bench_drivers.from_config()
         self.driver_obj.release = self.patcher.release
+        if not self.driver_obj.check_service(args.service):
+            raise RuntimeError("Driver doesn't support service %s!"
+                               % args.service)
 
         self.subvirted = False
         self.errors = "   None"

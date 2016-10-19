@@ -16,6 +16,8 @@ from openstack_bench import interceptions
 
 
 class BenchDriverBase(object):
+    SERVICES = None
+
     def __init__(self):
         self.release = None
         self.points = {}
@@ -32,3 +34,6 @@ class BenchDriverBase(object):
             point = interceptions.AnalysisPoint(place)
             self.points[place] = point
         point[release] = r_point
+
+    def check_service(self, service):
+        return service in self.SERVICES

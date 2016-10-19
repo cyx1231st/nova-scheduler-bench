@@ -24,6 +24,8 @@ def debug(*args, **kwargs):
 
 
 class BenchDriverScheduler(bases.BenchDriverBase):
+    SERVICES = {"api", "conductor", "scheduler", "compute"}
+
     def __init__(self):
         super(BenchDriverScheduler, self).__init__()
 
