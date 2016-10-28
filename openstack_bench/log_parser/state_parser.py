@@ -1,3 +1,4 @@
+import abc
 from collections import defaultdict
 
 from state_machine import LeafGraph
@@ -8,61 +9,50 @@ class ParseError(Exception):
     pass
 
 
-class Pace(object):
+class PaceBase(object):
     """ Pace is relative to transition. """
-    def __init__(self, log, from_node, edge, from_pace=None):
-        self.transition = edge
-        self.content = log
-        # state
-
+    def __init__(self, content, transition, from_node, to_node, from_pace):
+        self.transition = transition
+        self.content = content
         self.from_node = from_node
-        # to_node
+        self.to_node = to_node
 
         self.nxt = None
         self.bfo = None
-
-        # edge
-        # log
-
-        if from_pace:
+        if from_pace is not None:
             from_pace.connect(self)
-
-    @property
-    def to_node(self):
-        return self.edge.node
-
-    @property
-    def ident(self):
-        self.content.ident
 
     @property
     def state(self):
         return self.to_node
 
+    @property
+    def ident(self):
+        return self.content.ident
+
     def connect(self, p):
-        assert isinstance(p, Pace)
+        assert isinstance(p, self.__class__)
         assert self.nxt is None
         assert p.bfo is None
 
         self.nxt = p
         p.bfo = self
 
-    def confirm_pace(self, log):
-        edge = self.to_node.decide_edge(log)
-        if edge:
-            p = Pace(log, self.to_node, edge, self)
-            return p
-        else:
-            return None
+    @abc.abstractproperty
+    def assume_host(self):
+        return None
 
-    # LeafPace
-    @property
-    def log(self):
-        return self.content
+    @abc.abstractmethod
+    def confirm_pace(self, content):
+        assert isinstance(content, self.content.__class__)
+        return None
 
-    @property
-    def edge(self):
-        return self.transition
+
+class LeafPace(PaceBase):
+    """ LeafPace is relative to edge/log. """
+    def __init__(self, log, from_node, edge, from_pace=None):
+        super(LeafPace, self).__init__(
+            log, edge, from_node, edge.node, from_pace)
 
     @property
     def assume_host(self):
@@ -72,43 +62,74 @@ class Pace(object):
         else:
             return None
 
-    def __str__(self):
-        return "<Pace %s %s %s>" % (self.log.request_id,
-                                    self.log.seconds,
-                                    self.log.action)
+    def confirm_pace(self, log):
+        super(LeafPace, self).confirm_pace(log)
+        edge = self.to_node.decide_edge(log)
+        if edge:
+            p = LeafPace(log, self.to_node, edge, self)
+            return p
+        else:
+            return None
+
+    @property
+    def log(self):
+        return self.content
+
+    @property
+    def edge(self):
+        return self.transition
+
+    def __repr__(self):
+        return "<LeafPace %s %s %s>" % (self.log.request_id,
+                                        self.log.seconds,
+                                        self.log.action)
 
 
-class LeafInstance(object):
-    def __init__(self, graph, init_log):
-        assert isinstance(graph, LeafGraph)
+class InstanceBase(object):
+    def __init__(self, graph, ident):
         self.graph = graph
-        self.ident = init_log.ident
-        self.host = init_log.host
+        self.ident = ident
 
-        node, edge = self.graph.decide_node_edge(init_log)
-        if node is None or edge is None:
-            raise ParseError("Unrecognized init_log: %s" % init_log)
-        p = Pace(init_log, node, edge, None)
-        self.start_pace = p
-        self.last_pace = p
+        self.from_pace = None
+        self.to_pace = None
 
-        self.extra_logs = {}
+        self.fail_message = ""
 
     @property
-    def start_node(self):
-        return self.start_pace.from_node
+    def from_node(self):
+        return self.from_pace.from_node
 
     @property
-    def end_node(self):
-        return self.last_pace.to_node
-
-    @property
-    def start_edge(self):
-        return self.start_pace.edge
+    def to_node(self):
+        return self.to_pace.to_node
 
     @property
     def is_end(self):
-        return self.last_pace.to_node in self.graph.end_nodes
+        if self.to_pace and self.to_pace.to_node in self.graph.end_nodes:
+            return True
+        else:
+            return False
+
+    @property
+    def is_failed(self):
+        return bool(self.fail_message) or not self.is_end
+
+    @property
+    def state(self):
+        return self.to_pace.state
+
+
+class LeafInstance(InstanceBase):
+    def __init__(self, graph, ident, host):
+        assert isinstance(graph, LeafGraph)
+        super(LeafInstance, self).__init__(graph, ident)
+
+        self.host = host
+        self.extra_logs = {}
+
+    @property
+    def from_edge(self):
+        return self.from_pace.edge
 
     @property
     def service(self):
@@ -118,25 +139,24 @@ class LeafInstance(object):
     def assume_host(self):
         if not self.is_end:
             raise ParseError("LeafIns %s is not end!" % self)
-        return self.last_pace.assume_host
+        return self.to_pace.assume_host
 
     @property
-    def order(self):
-        return self.start_pace.log.seconds
+    def sort_key(self):
+        return self.from_pace.log.seconds
 
-    @property
-    def state(self):
-        return self.last_pace.state
+    def connect(self, ins):
+        self.to_pace.connect(ins.from_pace)
 
     def confirm(self, log):
         if self.ident != log.ident:
             return False
 
         if not self.is_end:
-            p = self.last_pace.confirm_pace(log)
+            p = self.to_pace.confirm_pace(log)
             assert self.host == log.host
             if p is not None:
-                self.last_pace = p
+                self.to_pace = p
                 return True
 
         edge = self.graph.decide_edge_ignored(log)
@@ -160,10 +180,10 @@ class LeafInstance(object):
         ret_str = "%r:" % self
 
         ret_str += "\nPaces:"
-        p = self.start_pace
+        p = self.from_pace
         while p:
             ret_str += "\n    %s" % p
-            if p is self.last_pace:
+            if p is self.to_pace:
                 break
             p = p.nxt
 
@@ -175,64 +195,32 @@ class LeafInstance(object):
         ret_str += "\n"
         return ret_str
 
-    def connect(self, ins):
-        self.last_pace.connect(ins.start_pace)
 
-
-class NestedPace(object):
+class NestedPace(PaceBase):
+    """ NestedPace is relative to subgraph/subinstance. """
     def __init__(self, sub_instance, from_pace=None):
-        # transistion
-        self.content = sub_instance
-        # state
-
-        # from_node
-        # to_node
-
-        self.bfo = None
-        self.nxt = None
-
-        # sub_instance
-        if from_pace:
-            from_pace.connect(self)
+        super(NestedPace, self).__init__(
+            sub_instance, sub_instance.graph, sub_instance.from_node,
+            sub_instance.to_node, from_pace)
 
     @property
     def sub_instance(self):
         return self.content
 
     @property
-    def transistion(self):
-        return self.sub_instance.graph
-
-    @property
-    def from_node(self):
-        return self.sub_instance.start_node
-
-    @property
-    def to_node(self):
-        return self.sub_instance.end_node
-
-    @property
-    def state(self):
-        return self.to_node
-
-    @property
     def assume_host(self):
         return self.content.assume_host
 
     def connect(self, p):
-        assert isinstance(p, NestedPace)
-        assert self.nxt is None
-        assert p.bfo is None
-
-        self.nxt = p
-        p.bfo = self
+        super(NestedPace, self).connect(p)
         self.sub_instance.connect(p.sub_instance)
 
     def confirm_pace(self, ins):
+        super(NestedPace, self).confirm_pace(ins)
         host = self.assume_host
         if host is not None and ins.host != host:
             return None
-        if self.to_node.accept_edge(ins.start_edge):
+        if self.to_node.accept_edge(ins.from_edge):
             p = NestedPace(ins, self)
             return p
         else:
@@ -249,91 +237,27 @@ class NestedPace(object):
         return ret_str
 
 
-class NestedInstance(object):
-    def __init__(self, graph, ident, helper):
+class NestedInstance(InstanceBase):
+    def __init__(self, graph, ident):
         assert isinstance(graph, MasterGraph)
-        self.graph = graph
-        self.ident = ident
-
-        self.start_pace = None
-        self.last_pace = None
-
-        self.fail_message = ""
-
-        class BreakIt(Exception):
-            pass
-
-        try:
-            while True:
-                graphs = self.assume_graphs()
-                if not graphs:
-                    break
-
-                try:
-                    for graph in graphs:
-                        host = self.assume_host
-                        for ins in helper.iter_by_graph(graph, host):
-                            if self.confirm(ins):
-                                helper.remove(ins)
-                                raise BreakIt()
-                except BreakIt:
-                    pass
-                else:
-                    self.fail_message = "%r cannot find next LeafInstance!" \
-                                        % self
-                    break
-        except ParseError as e:
-            self.fail_message = e.message
-
-        if self.fail_message:
-            pass
-        elif helper:
-            self.fail_message = "%r has unexpected instances!" % self
-        elif self.is_end is False:
-            self.fail_message = "%r is not ended!" % self
-
-        if self.fail_message:
-            print "PARSE FAIL >>>>>>>>>>>>>>>>>>>"
-            print "Fail message"
-            print "------------"
-            print self.fail_message
-            print ""
-            print "Parsed instance"
-            print "---------------"
-            print self
-            if helper:
-                print("Unexpected instances")
-                print "--------------------"
-                for ins in helper.instance_set:
-                    print("\n%s" % ins)
-
-    @property
-    def failed(self):
-        return bool(self.fail_message) or self.is_end is False
-
-    @property
-    def is_end(self):
-        if self.last_pace is not None:
-            if self.last_pace.to_node in self.graph.end_nodes:
-                return True
-        return False
+        super(NestedInstance, self).__init__(graph, ident)
 
     def confirm(self, ins):
         if self.is_end:
             return False
 
         p = None
-        if self.last_pace is None:
+        if self.to_pace is None:
             for node in self.graph.start_nodes:
-                if node.accept_edge(ins.start_edge):
+                if node.accept_edge(ins.from_edge):
                     p = NestedPace(ins)
-                    self.start_pace = p
+                    self.from_pace = p
                     break
         else:
-            p = self.last_pace.confirm_pace(ins)
+            p = self.to_pace.confirm_pace(ins)
 
         if p:
-            self.last_pace = p
+            self.to_pace = p
             if not ins.is_end:
                 raise ParseError("Instance %r is not complete!" % ins)
             else:
@@ -347,25 +271,22 @@ class NestedInstance(object):
         if self.is_end:
             return graphs
 
-        if self.last_pace is None:
+        if self.to_pace is None:
             for node in self.graph.start_nodes:
                 for edge in node.edges:
                     graphs.add(edge.graph)
         else:
-            node = self.last_pace.to_node
+            node = self.to_pace.to_node
             for edge in node.edges:
                 graphs.add(edge.graph)
         return graphs
 
     @property
     def assume_host(self):
-        if self.is_end or self.last_pace is None:
+        if self.is_end or self.to_pace is None:
             return None
-        return self.last_pace.assume_host
-
-    @property
-    def state(self):
-        return self.last_pace.state
+        else:
+            return self.to_pace.assume_host
 
     def __repr__(self):
         ret_str = "<NestedIns ident:%s graph:%s end:%s state:%s>" \
@@ -376,17 +297,17 @@ class NestedInstance(object):
         ret_str = "%r:" % self
 
         ret_str += "\nPaces:"
-        p = self.start_pace
+        p = self.from_pace
         while p:
             ret_str += "\n    %r" % p
-            if p is self.last_pace:
+            if p is self.to_pace:
                 break
             p = p.nxt
         ret_str += "\n"
-        p = self.start_pace
+        p = self.from_pace
         while p:
             ret_str += "\n%s" % p.sub_instance
-            if p is self.last_pace:
+            if p is self.to_pace:
                 break
             p = p.nxt
         return ret_str
@@ -428,7 +349,7 @@ class EngineHelper(object):
 
     def sort(self):
         for instances in self.instances_by_graph.itervalues():
-            instances.sort(key=lambda ins: ins.order)
+            instances.sort(key=lambda ins: ins.sort_key)
 
     def remove(self, ins):
         assert ins in self.instance_set
@@ -448,42 +369,98 @@ class ParserEngine(object):
     def parse(self):
         helpers_by_ident = {}
 
-        def build_service_logs(service, host, logs):
-            for log in logs:
-                ident = log.ident
-                assert ident is not None
-                assert service == log.service
-                assert host == log.host
-
-                helper = helpers_by_ident.get(ident)
-                if not helper:
-                    helper = EngineHelper(ident)
-                    helpers_by_ident[ident] = helper
-
-                for ins in helper.iter_by_sh(service, host):
-                    if ins.confirm(log):
-                        break
-                else:
-                    graph = self.graph.decide_subgraph(log)
-                    if not graph:
-                        raise RuntimeError("Unrecognized logline: %s" % log)
-                    else:
-                        ins = LeafInstance(graph, log)
-                        helper.add(ins)
-
         # step 1: build leaf instances
         logs_by_service_host = self.log_collector.service_host_dict
         for service, logs_by_host in logs_by_service_host.iteritems():
             for host, log_file in logs_by_host.iteritems():
-                build_service_logs(service, host, log_file.log_lines)
+                for log in log_file.log_lines:
+                    ident = log.ident
+                    assert ident is not None
+                    assert service == log.service
+                    assert host == log.host
+
+                    helper = helpers_by_ident.get(ident)
+                    if not helper:
+                        helper = EngineHelper(ident)
+                        helpers_by_ident[ident] = helper
+
+                    for ins in helper.iter_by_sh(service, host):
+                        if ins.confirm(log):
+                            break
+                    else:
+                        graph = self.graph.decide_subgraph(log)
+                        if not graph:
+                            raise RuntimeError(
+                                "Unrecognized logline: %s" % log)
+                        else:
+                            ins = LeafInstance(graph, log.ident, log.host)
+
+                            node, edge = ins.graph.decide_node_edge(log)
+                            if node is None or edge is None:
+                                raise ParseError(
+                                    "Unrecognized init_log:%s" % log)
+                            p = LeafPace(log, node, edge, None)
+                            ins.from_pace = p
+                            ins.to_pace = p
+
+                            helper.add(ins)
 
         for helper in helpers_by_ident.values():
             helper.sort()
 
+        class BreakIt(Exception):
+            pass
+
         # step 2: build nested instances
         instances = []
         for ident, helper in helpers_by_ident.iteritems():
-            instances.append(NestedInstance(self.graph,
-                                            ident,
-                                            helper))
+            instance = NestedInstance(self.graph, ident)
+
+            try:
+                while True:
+                    graphs = instance.assume_graphs()
+                    if not graphs:
+                        break
+
+                    try:
+                        for graph in graphs:
+                            host = instance.assume_host
+                            for ins in helper.iter_by_graph(graph, host):
+                                if instance.confirm(ins):
+                                    helper.remove(ins)
+                                    raise BreakIt()
+                    except BreakIt:
+                        pass
+                    else:
+                        instance.fail_message = "%r cannot find next LeafInstance!" \
+                                                % instance
+                        break
+            except ParseError as e:
+                instance.fail_message = e.message
+
+            if instance.fail_message:
+                pass
+            elif helper:
+                instance.fail_message = "%r has unexpected instances!" \
+                                        % instance
+            elif instance.is_end is False:
+                instance.fail_message = "%r is not ended!" % instance
+
+            if instance.is_failed:
+                print "PARSE FAIL >>>>>>>>>>>>>>>>>>>"
+                print "Fail message"
+                print "------------"
+                print instance.fail_message
+                print ""
+                print "Parsed instance"
+                print "---------------"
+                print instance
+                if helper:
+                    print("Unexpected instances")
+                    print "--------------------"
+                    for ins in helper.instance_set:
+                        print("\n%s" % ins)
+
+            instances.append(instance)
+
         return instances

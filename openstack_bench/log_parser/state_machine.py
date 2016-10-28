@@ -128,7 +128,7 @@ class Edge(object):
         self._assume_host = val
 
 
-class Graph(object):
+class GraphBase(object):
     def __init__(self, name):
         self.name = name
         self.mid_nodes = set()
@@ -198,7 +198,7 @@ class Graph(object):
             return False
 
 
-class LeafGraph(Graph):
+class LeafGraph(GraphBase):
     def __init__(self, name, master):
         self.edges = set()
         # TODO: support fork and join
@@ -264,7 +264,7 @@ class LeafGraph(Graph):
         return None
 
 
-class MasterGraph(Graph):
+class MasterGraph(GraphBase):
     def __init__(self, name):
         self.tracked_nodes_by_id = {}
         self.graphs = set()
