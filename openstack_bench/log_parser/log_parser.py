@@ -7,6 +7,8 @@ from os import path
 
 
 class LogLine(object):
+    _sentinal = object()
+
     def __init__(self, line, log_file):
         # line, filename
         self.filename = log_file.name
@@ -67,12 +69,15 @@ class LogLine(object):
             raise RuntimeError("Host and service mismatch in log %s"
                                % self.filename)
 
-        # correct, ident
+        # others
         self.correct = True
-        # TODO
-        self.ident = None
         self.prv = None
         self.nxt = None
+
+    @property
+    def ident(self):
+        assert self.instance_name is not None
+        return self.instance_name
 
     def __repr__(self):
         return str(self.seconds) + " " + \
@@ -103,6 +108,7 @@ class LogLine(object):
             return True
 
     def assert_c(self, service, key_word):
+        """ Deprecated """
         if self.service != service:
             return False
         if key_word not in self.action:

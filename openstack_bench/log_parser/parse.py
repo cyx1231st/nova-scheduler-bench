@@ -1166,3 +1166,37 @@ def main():
                     sm_parser1,
                     active_schedulers,
                     active_computes)
+
+
+import state_machine
+import state_parser
+
+
+def main1():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('folder',
+                        default=".",
+                        help="The logs are in that folder.")
+    parser.add_argument('--brief',
+                        action="store_true",
+                        help="Supress verbose error report.")
+    parser.add_argument('--csv-print-header', action="store_true",
+                        help="Write a row into the CSV file for the headers.")
+    parser.add_argument('--outfile',
+                        help="The output file of report.")
+    args = parser.parse_args()
+
+    driver_obj = bench_drivers.from_config()
+
+    log_collector = LogCollector(args.folder, driver_obj)
+    name_errors, mismatch_errors = log_collector.process_logs()
+    if name_errors:
+        print("duplicated instance names: %s" % len(name_errors))
+        print("duplicated instance names: %s" % name_errors)
+    if mismatch_errors:
+        print("mismatched names and ids: %s" % len(mismatch_errors))
+        print("mismatched names and ids: %s" % mismatch_errors)
+
+    master_graph = state_machine.build_graph()
+    engine = state_parser.ParserEngine(master_graph, log_collector)
+    engine.parse()
