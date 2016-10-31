@@ -1168,8 +1168,7 @@ def main():
                     active_computes)
 
 
-import state_machine
-import state_parser
+import parser_engine
 
 
 def main1():
@@ -1197,6 +1196,6 @@ def main1():
         print("mismatched names and ids: %s" % len(mismatch_errors))
         print("mismatched names and ids: %s" % mismatch_errors)
 
-    master_graph = state_machine.build_graph()
-    engine = state_parser.ParserEngine(master_graph, log_collector)
+    master_graph = driver_obj.build_graph()
+    engine = parser_engine.ParserEngine(master_graph, log_collector)
     engine.parse()

@@ -13,6 +13,7 @@
 # under the License.
 
 from openstack_bench.bench_drivers import register_driver
+from openstack_bench.log_parser.state_graph import MasterGraph
 from openstack_bench.releases import Release
 
 import bases
@@ -167,6 +168,56 @@ class BenchDriverScheduler(bases.BenchDriverBase):
                 "%s success" % arg["instance"].display_name,
             excep=lambda arg:
                 "%s fail: %r" % (arg["instance"].display_name, arg['exc_val']))
+
+    def build_graph(self):
+        master = MasterGraph("master")
+        build = master.build
+
+        build(0, 1, "api", "received")
+        build(1, 20, "api", "failed:")
+        build(1, 2, "api", "sent/retried")
+        build(2, 3, "conductor", "received")
+        build(3, 21, "conductor", "failed: attempt")
+        build(3, 4, "conductor", "attempts")
+        build(4, 5, "conductor", "sent scheduler")
+        build(5, 6, "scheduler", "received")
+        build(6, 7, "scheduler", "start scheduling")
+        build(7, 8, "scheduler", "start_db")
+        build(8, 9, "scheduler", "finish_db")
+        build(9, 10, "scheduler", "finish scheduling")
+        build(10, 11, "scheduler", "selected")
+        build(10, 12, "scheduler", "failed:")
+        build(12, 22, "conductor", "failed: NoValidHost")
+        build(11, 13, "conductor", "decided")
+        build(13, 14, "conductor", "sent")
+        build(14, 15, "compute", "received")
+        build(15, 24, "compute", "success")
+        build(24, 25, "compute", "finished: active")
+        # TODO: change to "fail: Rescheduled"
+        # build(15, 16, "compute", "fail: Rescheduled")
+        build(15, 16, "compute", "fail: retry")
+        build(15, 23, "compute", "fail:")
+        build(15, 26, "compute", "finished: None")
+        build(16, 2, "compute", "sent/retried")
+
+        master.get_graph(0, 1).add_ignore_edge("api", "api returned")
+        master.get_graph(14, 15).add_ignore_edge("compute", "finished:")
+
+        edge = master.get_edge(13, 14)
+        edge.f_assume_host = lambda action: action.split(" ")[1]
+
+        master.set_state(20, "API FAIL")
+        master.set_state(21, "RETRY FAIL")
+        master.set_state(22, "NO VALID HOST")
+        master.set_state(23, "COMPUTE FAIL")
+        master.set_state(25, "SUCCESS")
+        master.set_state(26, "COMPUTE FAIL")
+
+        print master
+        for sub in master.graphs:
+            print sub
+
+        return master
 
 
 # TODO: implement this in the metaclass
