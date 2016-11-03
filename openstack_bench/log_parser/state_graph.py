@@ -1,12 +1,19 @@
 from orderedset import OrderedSet
 
 
+# TODO: define transition, a transition is an Edge or a LeafGraph
+# class Transition(object):
+#    pass
+
+
 class Node(object):
+    UNKNOWN_STATE = "_UNKNOWN_"
+
     def __init__(self, id_, master_graph):
         self.id_ = id_
         self.master_graph = master_graph
         self.edges = OrderedSet()
-        self.state = None
+        self._state = None
 
         # determine ownership
         self.determined = False
@@ -15,7 +22,7 @@ class Node(object):
     def __repr__(self):
         if self.determined:
             if self.graph:
-                if self.state:
+                if self.state is not self.UNKNOWN_STATE:
                     return "<Node#%s: %s %r>" \
                            % (self.id_, self.graph.name, self.state)
                 else:
@@ -26,13 +33,24 @@ class Node(object):
             if self.graph is self.master_graph:
                 return "<!Node#%s: GUESS MASTER!>" % self.id_
             elif self.graph:
-                if self.state:
+                if self.state is not self.UNKNOWN_STATE:
                     return "<Node#%s: ?%s %r>" \
                            % (self.id_, self.graph.name, self.state)
                 else:
                     return "<Node#%s: ?%s>" % (self.id_, self.graph.name)
             else:
                 return "<!Node#%s: NEW!>" % self.id_
+
+    @property
+    def state(self):
+        if self._state is None:
+            return self.UNKNOWN_STATE
+        else:
+            return self._state
+
+    @state.setter
+    def state(self, val):
+        self._state = val
 
     @property
     def correct(self):
@@ -111,9 +129,9 @@ class Edge(object):
     def __repr__(self):
         if self.node:
             return "<Edge#%s -> Node#%s, %s>" \
-                   % (self.service, self.node.id_, self.keyword)
+                   % (self.graph.name, self.node.id_, self.keyword)
         else:
-            return "<!Edge#%s -> None, %s!>" % (self.service, self.keyword)
+            return "<!Edge#%s -> None, %s!>" % (self.graph.name, self.keyword)
 
     def accept(self, log):
         return self.service == log.service and self.keyword in log.action
@@ -204,11 +222,8 @@ class LeafGraph(GraphBase):
         # TODO: support fork and join
         self.ignored_edges = set()
         self.master_graph = master
+        self.service = name
         super(LeafGraph, self).__init__(name)
-
-    @property
-    def service(self):
-        return self.name
 
     def add_edge(self, from_node, to_node, service_name, keyword):
         if service_name != self.service:
@@ -368,11 +383,42 @@ class MasterGraph(GraphBase):
                 print(node)
             raise
 
+    @staticmethod
+    def build_from_driver(driver):
+        graph = driver.build_graph()
+
+        print graph
+        for sub in graph.graphs:
+            print sub
+
+        return graph
+
     def decide_subgraph(self, log):
         for sub in self.graphs:
             if sub.accept(log):
                 return sub
         return None
+
+    @property
+    def services(self):
+        services = set()
+        for sub in self.graphs:
+            services.add(sub.service)
+        return services
+
+    @property
+    def names(self):
+        names = set()
+        for sub in self.graphs:
+            names.add(sub.name)
+        return names
+
+    @property
+    def states(self):
+        states = set()
+        for node in self.end_nodes:
+            states.add(node.state)
+        return states
 
     def __repr__(self):
         ret_str = ">>> MasterGraph:"

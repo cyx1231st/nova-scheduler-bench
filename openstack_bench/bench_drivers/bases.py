@@ -29,6 +29,9 @@ class BenchDriverBase(object):
     def build_graph(self):
         raise NotImplementedError()
 
+    def build_statistics(self, s_engine, report):
+        raise NotImplementedError()
+
     def register_point(self, place, before=None,
                        after=None, excep=None, release=None):
         point = self.points.get(place)

@@ -2,6 +2,7 @@ import abc
 
 from state_graph import LeafGraph
 from state_graph import MasterGraph
+from state_graph import Node
 
 
 class ParseError(Exception):
@@ -41,6 +42,14 @@ class PaceBase(object):
     def assume_host(self):
         return None
 
+    @abc.abstractproperty
+    def from_seconds(self):
+        return None
+
+    @abc.abstractproperty
+    def to_seconds(self):
+        return None
+
     @abc.abstractmethod
     def confirm_pace(self, content):
         assert isinstance(content, self.content.__class__)
@@ -64,6 +73,14 @@ class LeafPace(PaceBase):
     @property
     def log(self):
         return self.content
+
+    @property
+    def from_seconds(self):
+        return self.log.seconds
+
+    @property
+    def to_seconds(self):
+        return self.log.seconds
 
     @property
     def edge(self):
@@ -98,6 +115,14 @@ class NestedPace(PaceBase):
     @property
     def assume_host(self):
         return self.content.assume_host
+
+    @property
+    def from_seconds(self):
+        return self.sub_instance.from_seconds
+
+    @property
+    def to_seconds(self):
+        return self.sub_instance.to_seconds
 
     def connect(self, p):
         super(NestedPace, self).connect(p)
@@ -148,6 +173,18 @@ class InstanceBase(object):
             return self.to_pace.to_node
 
     @property
+    def start_leaf_pace(self):
+        return None
+
+    @property
+    def from_seconds(self):
+        return self.from_pace.from_seconds
+
+    @property
+    def to_seconds(self):
+        return self.to_pace.to_seconds
+
+    @property
     def is_end(self):
         if self.to_pace and self.to_pace.to_node in self.graph.end_nodes:
             return True
@@ -164,8 +201,8 @@ class InstanceBase(object):
             return "UNKNOWN"
         else:
             state = self.to_node.state
-            if state is None:
-                return "None"
+            if state is Node.UNKNOWN_STATE:
+                return "-"
             else:
                 return state
 
@@ -175,6 +212,26 @@ class InstanceBase(object):
             return None
         else:
             return self.to_pace.assume_host
+
+    @property
+    def name(self):
+        return self.graph.name
+
+    def iterall(self):
+        p = self.start_leaf_pace
+        while p:
+            yield p
+            if p.to_node in self.graph.end_nodes:
+                break
+            p = p.nxt
+
+    def __iter__(self):
+        p = self.from_pace
+        while p:
+            yield p.content
+            if p is self.to_pace:
+                break
+            p = p.nxt
 
     def __str__(self):
         ret_str = "%r:" % self
@@ -209,6 +266,10 @@ class LeafInstance(InstanceBase):
     @property
     def service(self):
         return self.graph.service
+
+    @property
+    def start_leaf_pace(self):
+        return self.from_pace
 
     def connect(self, ins):
         self.to_pace.connect(ins.from_pace)
@@ -267,6 +328,10 @@ class NestedInstance(InstanceBase):
     def __init__(self, graph, ident):
         assert isinstance(graph, MasterGraph)
         super(NestedInstance, self).__init__(graph, ident)
+
+    @property
+    def start_leaf_pace(self):
+        return self.from_pace.content.from_pace
 
     def confirm(self, ins):
         if self.ident != ins.ident:

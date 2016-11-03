@@ -213,11 +213,146 @@ class BenchDriverScheduler(bases.BenchDriverBase):
         master.set_state(25, "SUCCESS")
         master.set_state(26, "COMPUTE FAIL")
 
-        print master
-        for sub in master.graphs:
-            print sub
+        master.get_graph(12, 22).name = "conductor1"
+        master.get_graph(11, 13).name = "conductor1"
 
         return master
+
+    def build_statistics(self, s_engine, report):
+        _i_apif = frozenset([(0, 20)])
+        _i_api = frozenset([(0, 20), (0, 2)])
+        _i_apis = frozenset([(0, 2)])
+        _i_atc = frozenset([(1, 3)])
+        _i_con1 = frozenset([(2, 5), (2, 21)])
+        _i_cts = frozenset([(4, 6)])
+        _i_sch = frozenset([(5, 11), (5, 12)])
+        _i_stc = frozenset([(10, 13), (10, 22)])
+        _i_con2 = frozenset([(11, 14)])
+        _i_contc = frozenset([(13, 15)])
+        _i_com = frozenset([(14, 2), (14, 23), (14, 25), (14, 26)])
+        _i_con = frozenset(_i_con1 | _i_con2)
+
+        _i_fil = frozenset([(6, 10)])
+        _i_cac = frozenset([(7, 9)])
+        _i_gap = frozenset([(8, 16), (8, 23), (8, 24)])
+        _i_sus = frozenset([(0, 25)])
+        _i_nvh = frozenset([(0, 22)])
+        _i_ret = frozenset([(0, 16)])
+
+        _i_all = [_i_api, _i_con, _i_sch, _i_com]
+        _i_cut = [_i_api, _i_con1, _i_con2, _i_sch, _i_com, _i_atc, _i_cts,
+                  _i_stc, _i_contc, _i_fil, _i_cac, _i_gap, _i_sus, _i_apif,
+                  _i_nvh, _i_ret, _i_apis]
+        cut_edge = s_engine.graph.get_edge(16, 2)
+
+        all_, cut, cutted = s_engine.extract_intervals(_i_all, _i_cut, cut_edge)
+
+        report.register("active schedulers",
+                        s_engine.active_by_service.get("scheduler", 0))
+        report.register("active computes",
+                        s_engine.active_by_service.get("compute", 0))
+        report.blank()
+        report.register("total requests",
+                        s_engine.total_requests)
+        report.register("success requests",
+                        s_engine.requests_by_state.get("SUCCESS", 0))
+        report.register("nvh requests",
+                        s_engine.requests_by_state.get("NO VALID HOST", 0))
+        report.register("rtf requests",
+                        s_engine.requests_by_state.get("RETRY FAIL", 0))
+        report.register("api fail requests",
+                        s_engine.requests_by_state.get("API FAIL", 0))
+        report.register("compute fail requests",
+                        s_engine.requests_by_state.get("COMPUTE FAIL", 0))
+        report.register("error requests",
+                        s_engine.requests_by_state.get("PARSE ERROR", 0))
+        report.blank()
+        report.register("total valid queries",
+                        s_engine.count(3))
+        report.register("direct successful queries",
+                        len(cut[_i_sus]))
+        report.register("direct nvh queries",
+                        len(cut[_i_nvh]))
+        report.register("direct retried queries",
+                        len(cut[_i_ret]))
+        report.register("retry successful queries",
+                        s_engine.count(25) - len(cut[_i_sus]))
+        report.register("retry nvh queries",
+                        s_engine.count(22) - len(cut[_i_nvh]))
+        report.register("retry retried queries",
+                        s_engine.count(16) - len(cut[_i_ret]))
+        report.blank()
+        report.register("wallclock total",
+                        s_engine.intervals_requests.wall_time())
+        report.register("wallclock api",
+                        s_engine.intervals_by_services["api"].wall_time())
+        report.register("wallclock conductor",
+                        s_engine.intervals_by_services["conductor"].wall_time())
+        report.register("wallclock scheduler",
+                        s_engine.intervals_by_services["scheduler"].wall_time())
+        report.register("wallclock compute",
+                        s_engine.intervals_by_services["compute"].wall_time())
+        report.blank()
+        report.register("time query avg", cut[_i_sus].average())
+        report.register("time inapi avg", cut[_i_api].average())
+        report.register("time a-con avg", cut[_i_atc].average())
+        report.register("time cond1 avg", cut[_i_con1].average())
+        report.register("time c-sch avg", cut[_i_cts].average())
+        report.register("time sched avg", cut[_i_sch].average())
+        report.register("time s-con avg", cut[_i_stc].average())
+        report.register("time cond2 avg", cut[_i_con2].average())
+        report.register("time c-com avg", cut[_i_contc].average())
+        report.register("time compu avg", cut[_i_com].average())
+        report.blank()
+        report.register("time filter avg", cut[_i_fil].average())
+        report.register("time refresh avg", cut[_i_cac].average())
+        report.register("time gap avg", cut[_i_gap].average())
+        report.blank()
+        sum_query_avg = cut[_i_api].average()\
+                        + cut[_i_atc].average()\
+                        + cut[_i_con1].average()\
+                        + cut[_i_cts].average()\
+                        + cut[_i_sch].average()\
+                        + cut[_i_stc].average()\
+                        + cut[_i_con2].average()\
+                        + cut[_i_contc].average()\
+                        + cut[_i_com].average()
+        report.register("percent api part",
+                        cut[_i_api].average() / sum_query_avg * 100)
+        report.register("percent cond part",
+                        (cut[_i_con1].average() + cut[_i_con2].average())
+                        / sum_query_avg * 100)
+        report.register("percent sch part",
+                        cut[_i_sch].average() / sum_query_avg * 100)
+        report.register("percent comp part",
+                        cut[_i_com].average() / sum_query_avg * 100)
+        report.register("percent msg part",
+                        (cut[_i_atc].average() + cut[_i_cts].average()
+                         + cut[_i_stc].average() + cut[_i_contc].average())
+                        / sum_query_avg * 100)
+        report.register("percent filter part",
+                        cut[_i_fil].average() / sum_query_avg * 100)
+        report.register("percent refresh part",
+                        cut[_i_cac].average() / sum_query_avg * 100)
+        report.register("percent gap part",
+                        cut[_i_gap].average() / sum_query_avg * 100)
+        report.blank()
+        report.register("request per sec",
+                        (s_engine.total_requests -
+                         s_engine.requests_by_state.get("API FAIL", 0))
+                        / s_engine.intervals_requests.wall_time())
+        report.register("query per sec",
+                        s_engine.count(3)
+                        / s_engine.intervals_requests.wall_time())
+        report.register("success per sec",
+                        s_engine.requests_by_state.get("SUCCESS", 0)
+                        / s_engine.intervals_requests.wall_time())
+        report.blank()
+        report.register("percent query retry",
+                        s_engine.count(16)
+                        / float(s_engine.count(1) - s_engine.count(20)) * 100)
+        report.register("percent api fail",
+                        s_engine.count(20) / float(s_engine.count(1)) * 100)
 
 
 # TODO: implement this in the metaclass

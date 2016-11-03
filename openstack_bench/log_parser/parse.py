@@ -1168,6 +1168,9 @@ def main():
                     active_computes)
 
 
+from state_graph import MasterGraph
+from statistics import Engine
+from statistics import Report
 import parser_engine
 
 
@@ -1196,6 +1199,16 @@ def main1():
         print("mismatched names and ids: %s" % len(mismatch_errors))
         print("mismatched names and ids: %s" % mismatch_errors)
 
-    master_graph = driver_obj.build_graph()
+    master_graph = MasterGraph.build_from_driver(driver_obj)
     engine = parser_engine.ParserEngine(master_graph, log_collector)
-    engine.parse()
+    instances = engine.parse()
+
+    s_engine = Engine(master_graph, instances)
+
+    if args.brief:
+        s_engine.report()
+    else:
+        report = Report()
+        report.set_outfile(args.outfile, args.csv_print_header)
+        driver_obj.build_statistics(s_engine, report)
+        report.export()

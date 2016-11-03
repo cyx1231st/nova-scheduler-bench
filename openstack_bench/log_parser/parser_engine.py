@@ -100,7 +100,7 @@ class ParserEngine(object):
             pass
 
         # step 2: build nested instances
-        instances = []
+        instances = {}
         for ident, helper in helpers_by_ident.iteritems():
             instance = NestedInstance(self.graph, ident)
 
@@ -149,6 +149,6 @@ class ParserEngine(object):
                     for ins in helper.instance_set:
                         print("\n%s" % ins)
 
-            instances.append(instance)
+            instances[ident] = instance
 
         return instances
