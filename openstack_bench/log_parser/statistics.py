@@ -106,13 +106,15 @@ class Intervals(object):
 
 
 class Report(object):
-    def __init__(self):
+    def __init__(self, name):
         self.outfile = None
         self.contents = []
         self.key_len = 0
+        self.name = name
+        self.register("Name", name)
 
     def register(self, key, value):
-        key = key + ":"
+        key = key
         self.contents.append((key, value))
         self.key_len = max(self.key_len, len(key))
 
@@ -130,16 +132,25 @@ class Report(object):
                 if content is None:
                     print("")
                 elif isinstance(content[1], Integral):
-                    format_str = "{:<" + str(self.key_len + 1) + "}{:d}"
-                    print(format_str.format(content[0], content[1]))
+                    format_str = "{:<" + str(self.key_len + 2) + "}{:d}"
+                    print(format_str.format(content[0]+":", content[1]))
                 elif isinstance(content[1], Real):
-                    format_str = "{:<" + str(self.key_len + 1) + "}{:7.5f}"
-                    print(format_str.format(content[0], content[1]))
+                    format_str = "{:<" + str(self.key_len + 2) + "}{:7.5f}"
+                    print(format_str.format(content[0]+":", content[1]))
                 else:
-                    format_str = "{:<" + str(self.key_len + 1) + "}{:s}"
-                    print(format_str.format(content[0], content[1]))
+                    format_str = "{:<" + str(self.key_len + 2) + "}{:s}"
+                    print(format_str.format(content[0]+":", content[1]))
         else:
-            pass
+            outfile = open(self.outfile, "a+")
+            if self.print_header:
+                header_fields = [content[0] for content in self.contents
+                                 if content is not None]
+                outfile.write(",".join(header_fields) + '\n')
+            row_fields = [str(content[1]) for content in self.contents
+                          if content is not None]
+            outfile.write(",".join(row_fields) + '\n')
+            outfile.flush()
+            outfile.close()
 
 
 class Engine(object):
@@ -238,8 +249,8 @@ class Engine(object):
     def count(self, node_id):
         return self.count_by_node.get(node_id, 0)
 
-    def report(self):
-        report = Report()
+    def report(self, name):
+        report = Report(name)
 
         service_keys = sorted(list(self.graph.services))
         name_keys = sorted(list(self.graph.names))

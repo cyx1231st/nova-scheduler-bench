@@ -1206,9 +1206,9 @@ def main1():
     s_engine = Engine(master_graph, instances)
 
     if args.brief:
-        s_engine.report()
+        s_engine.report(args.folder)
     else:
-        report = Report()
+        report = Report(args.folder)
         report.set_outfile(args.outfile, args.csv_print_header)
         driver_obj.build_statistics(s_engine, report)
         report.export()
