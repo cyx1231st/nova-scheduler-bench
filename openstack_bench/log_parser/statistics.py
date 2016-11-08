@@ -12,7 +12,8 @@ class Interval(object):
         self.duration = end - start
 
     def __repr__(self):
-        ret_str = "<%.3f, %.3f -> %.3f>" % (self.start, self.end, self.duration)
+        ret_str = "<%.3f, %.3f -> %.3f>" \
+                  % (self.start, self.end, self.duration)
         return ret_str
 
 
@@ -51,7 +52,7 @@ class Intervals(object):
             else:
                 self._ave = sum([interval.duration
                                  for interval in self.intervals])\
-                            / len(self.intervals)
+                               / len(self.intervals)
         return self._ave
 
     def x_y_incremental(self):
@@ -161,19 +162,106 @@ class Engine(object):
         self.graph = graph
         self.available_instances = []
         self.error_instances = []
-        # TODO: carsal constraints
 
+        constraints = self.check()
+        self.relax_constraints(constraints)
         self.parse()
+
+    def check(self):
+        requests = 0
+        adjust_requests = 0
+        adjust_points = set()
+        constraints = Constraints()
+
+        for instance in self.instances.itervalues():
+            requests += 1
+            if instance.is_failed or instance.state in ["UNKNOWN", "-"]:
+                self.error_instances.append(instance)
+                continue
+            else:
+                self.available_instances.append(instance)
+
+            last_ins = None
+            adjust = False
+            for leaf_ins in instance:
+                if last_ins:
+                    constraints.add(last_ins.host, last_ins.to_seconds,
+                                    leaf_ins.host, leaf_ins.from_seconds)
+                    if last_ins.to_seconds > leaf_ins.from_seconds:
+                        adjust_points.add((last_ins.host, leaf_ins.host))
+                        if not adjust:
+                            adjust = True
+                            adjust_requests += 1
+                last_ins = leaf_ins
+
+        self.total_requests = requests
+        self.requests_to_adjust = adjust_requests
+        self.points_to_adjust = adjust_points
+        return constraints
+
+    def relax_constraints(self, constraints):
+        print "Adjustion requests: %s" % self.requests_to_adjust
+        print "Violated constraints:"
+        conp_list = constraints.group_by_host()
+        min_dist = None
+        for conp in conp_list:
+            if conp.violated:
+                print conp
+            dist = conp.distance
+            if dist is not None:
+                if min_dist is None:
+                    min_dist = dist
+                else:
+                    min_dist = min(min_dist, dist)
+        print "Min distance: %.3f" % min_dist
+
+        """
+        host_dict = constraints.group_by_host()
+        host_const_list = host_dict.items()
+        host_const_list.sort(key=lambda item: len(item[1]))
+
+        for host, const_list in host_const_list:
+            from_ = None
+            to_ = None
+            for const in const_list:
+                if const.adjusted:
+                    continue
+                else:
+                    const.adjusted = True
+                if host == const.from_host:
+                    if from_ is None:
+                        from_ = const.offset
+                    else:
+                        from_ = min(from_, const.offset)
+                elif host == const.to_host:
+                    if to_ is None:
+                        to_ = const.offset
+                    else:
+                        to_ = min(to_, const.offset)
+                else:
+                    raise RuntimeError("Impossible")
+            offset = 0
+            if from_ is not None and to_ is not None:
+                offset = (from_ - to_) / 2
+            elif from_ is None and to_ is None:
+                pass
+            elif from_ is None:
+                pass
+            else:
+                pass
+            print "%s: %s, %s" % (host, -to_, from_)
+        # print "test"
+        # for item in ready_host_offset:
+        #     print item
+        """
+        print "-"*20
 
     def parse(self):
         # sets
         hosts_set_by_service = defaultdict(set)
 
         # counters
-        requests = 0
         requests_by_state = defaultdict(lambda: 0)
-        adjust_requests = 0
-        adjust_points = set()
         count_by_node = defaultdict(lambda: 0)
 
         # intervals
@@ -182,29 +270,16 @@ class Engine(object):
         intervals_by_names = defaultdict(list)
         intervals_by_comms = defaultdict(list)
 
-        for instance in self.instances.itervalues():
-            requests += 1
-            if instance.is_failed or instance.state in ["UNKNOWN", "-"]:
-                requests_by_state["PARSE ERROR"] += 1
-                self.error_instances.append(instance)
-                continue
-            else:
-                requests_by_state[instance.state] += 1
-                self.available_instances.append(instance)
+        for instance in self.available_instances:
+            requests_by_state[instance.state] += 1
 
             interval = Interval(instance.from_seconds,
                                 instance.to_seconds)
             intervals_of_requests.append(interval)
 
             last_ins = None
-            adjust = False
             for leaf_ins in instance:
                 if last_ins:
-                    if last_ins.to_seconds > leaf_ins.from_seconds:
-                        adjust_points.add((last_ins.host, leaf_ins.host))
-                        if not adjust:
-                            adjust = True
-                            adjust_requests += 1
                     comm_key = (last_ins.to_pace.from_node.id_,
                                 leaf_ins.from_pace.to_node.id_)
                     interval = Interval(last_ins.to_seconds,
@@ -219,15 +294,13 @@ class Engine(object):
                 hosts_set_by_service[leaf_ins.service].add(leaf_ins.host)
 
                 last_ins = leaf_ins
+
             count_by_node[instance.from_node.id_] += 1
             for p in instance.iterall():
                 count_by_node[p.to_node.id_] += 1
 
         self.active_by_service = defaultdict(lambda: 0)
-        self.total_requests = requests
         self.requests_by_state = requests_by_state
-        self.requests_to_adjust = adjust_requests
-        self.points_to_adjust = len(adjust_points)
         self.count_by_node = count_by_node
 
         self.intervals_requests = Intervals(intervals_of_requests)
@@ -384,3 +457,129 @@ class Tracking(object):
             return None
         else:
             return tracked
+
+
+class Constraints(object):
+    def __init__(self):
+        self.constraints_by_from = defaultdict(dict)
+        self.size = 0
+
+    def add(self, from_host, from_, to_host, to):
+        if from_host == to_host:
+            return
+        if to_host not in self.constraints_by_from[from_host]:
+            constraint = Constraint(from_host, to_host)
+            self.constraints_by_from[from_host][to_host] = constraint
+            self.size += 1
+        else:
+            constraint = self.constraints_by_from[from_host][to_host]
+        constraint.adjust(from_, to)
+
+    def group_by_host(self):
+        host_dict = defaultdict(dict)
+        host_dict1 = defaultdict(list)
+        for from_host, to_dict in self.constraints_by_from.iteritems():
+            for to_host, constraint in to_dict.iteritems():
+                conp = host_dict[from_host].get(to_host)
+                if not conp:
+                    conp = ConstraintPair(constraint)
+                    host_dict[from_host][to_host] = conp
+                    host_dict[to_host][from_host] = conp
+                    host_dict1[from_host].append(conp)
+                    host_dict1[to_host].append(conp)
+                else:
+                    conp.set(constraint)
+
+        host_keys = host_dict1.keys()
+        host_keys.sort(key=lambda host: len(host_dict1[host]), reverse=True)
+        ret_list = []
+        for key in host_keys:
+            c_list = host_dict1[key]
+            for c in c_list:
+                if not c.adjusted and c.from_host != key:
+                    c.reverse()
+                    assert c.from_host == key
+            c_list.sort(key=lambda key: key.to_host)
+            for c in c_list:
+                if not c.adjusted:
+                    c.adjusted = True
+                    ret_list.append(c)
+        return ret_list
+
+    def __str__(self):
+        ret_str = "Constraints(%d):" % self.size
+        for to_dict in self.constraints_by_from.itervalues():
+            for cons in to_dict.itervalues():
+                if cons.violated:
+                    ret_str += "\n   %s" % cons
+        return ret_str
+
+
+class ConstraintPair(object):
+    def __init__(self, constraint):
+        self.from_host = constraint.from_host
+        self.to_host = constraint.to_host
+        self.offset = constraint.offset
+        self.r_offset = None
+        self.adjusted = False
+
+    def set(self, constraint):
+        assert self.r_offset is None
+        assert self.from_host == constraint.to_host
+        assert self.to_host == constraint.from_host
+        self.r_offset = constraint.offset
+
+    @property
+    def violated(self):
+        if self.offset is not None and self.offset <= 0:
+            return True
+        if self.r_offset is not None and self.r_offset <= 0:
+            return True
+        return False
+
+    @property
+    def distance(self):
+        if self.offset is None or self.r_offset is None:
+            return None
+        else:
+            return self.offset + self.r_offset
+
+    def reverse(self):
+        self.from_host, self.to_host = self.to_host, self.from_host
+        self.offset, self.r_offset = self.r_offset, self.offset
+
+    def __repr__(self):
+        if self.r_offset is None:
+            r_offset = "None"
+        else:
+            r_offset = "%.3f" % -self.r_offset
+        if self.offset is None:
+            offset = "None"
+        else:
+            offset = "%.3f" % self.offset
+        return "<ConsP %s -> %s: (%s, %s)>" \
+               % (self.from_host, self.to_host,
+                  r_offset, offset)
+
+
+class Constraint(object):
+    def __init__(self, from_host, to_host):
+        self.from_host = from_host
+        self.to_host = to_host
+        self.offset = None
+        self.adjusted = False
+
+    def adjust(self, from_, to):
+        offset = to - from_
+        if self.offset is None:
+            self.offset = offset
+        else:
+            self.offset = min(self.offset, offset)
+
+    @property
+    def violated(self):
+        return self.offset < 0 or self.offset == 0
+
+    def __repr__(self):
+        return "<Cons %s -> %s: %7.5f>" \
+               % (self.from_host, self.to_host, self.offset)

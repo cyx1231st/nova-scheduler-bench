@@ -265,7 +265,7 @@ class BenchDriverScheduler(bases.BenchDriverBase):
         report.register("compute fail requests",
                         s_engine.requests_by_state.get("COMPUTE FAIL", 0))
         report.register("error requests",
-                        s_engine.requests_by_state.get("PARSE ERROR", 0))
+                        len(s_engine.error_instances))
         report.blank()
         report.register("total valid queries",
                         s_engine.count(3))
