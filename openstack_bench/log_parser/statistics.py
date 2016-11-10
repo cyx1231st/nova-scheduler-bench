@@ -51,8 +51,8 @@ class Intervals(object):
                 self._ave = 0
             else:
                 self._ave = sum([interval.duration
-                                 for interval in self.intervals])\
-                               / len(self.intervals)
+                                 for interval in self.intervals]) /\
+                    len(self.intervals)
         return self._ave
 
     def x_y_incremental(self):
@@ -200,13 +200,13 @@ class Engine(object):
         return constraints
 
     def relax_constraints(self, constraints):
-        print "Adjustion requests: %s" % self.requests_to_adjust
+        print "Violated requests: %s" % self.requests_to_adjust
         print "Violated constraints:"
-        conp_list = constraints.group_by_host()
+        conp_list, host_dict = constraints.group_by_host()
         min_dist = None
         for conp in conp_list:
             if conp.violated:
-                print conp
+                print "    %s" % conp
             dist = conp.distance
             if dist is not None:
                 if min_dist is None:
@@ -215,45 +215,16 @@ class Engine(object):
                     min_dist = min(min_dist, dist)
         print "Min distance: %.3f" % min_dist
 
-        """
-        host_dict = constraints.group_by_host()
-        host_const_list = host_dict.items()
-        host_const_list.sort(key=lambda item: len(item[1]))
+        c_engine = CausalEngine(host_dict, conp_list, min_dist/2)
+        c_engine.relax(conp_list[0].from_host)
 
-        for host, const_list in host_const_list:
-            from_ = None
-            to_ = None
-            for const in const_list:
-                if const.adjusted:
-                    continue
-                else:
-                    const.adjusted = True
-                if host == const.from_host:
-                    if from_ is None:
-                        from_ = const.offset
-                    else:
-                        from_ = min(from_, const.offset)
-                elif host == const.to_host:
-                    if to_ is None:
-                        to_ = const.offset
-                    else:
-                        to_ = min(to_, const.offset)
-                else:
-                    raise RuntimeError("Impossible")
-            offset = 0
-            if from_ is not None and to_ is not None:
-                offset = (from_ - to_) / 2
-            elif from_ is None and to_ is None:
-                pass
-            elif from_ is None:
-                pass
-            else:
-                pass
-            print "%s: %s, %s" % (host, -to_, from_)
-        # print "test"
-        # for item in ready_host_offset:
-        #     print item
-        """
+        print "Adjustion result(%d):" % c_engine.counter
+        hosts = [host for host in c_engine.hosts.values()]
+        hosts.sort(key=lambda host: host.name)
+        for host in hosts:
+            if host.low != 0:
+                print "    %s" % host
+
         print "-"*20
 
     def parse(self):
@@ -504,7 +475,7 @@ class Constraints(object):
                 if not c.adjusted:
                     c.adjusted = True
                     ret_list.append(c)
-        return ret_list
+        return ret_list, host_dict1
 
     def __str__(self):
         ret_str = "Constraints(%d):" % self.size
@@ -583,3 +554,213 @@ class Constraint(object):
     def __repr__(self):
         return "<Cons %s -> %s: %7.5f>" \
                % (self.from_host, self.to_host, self.offset)
+
+
+class HostConstraint(object):
+    def __init__(self, name):
+        self.name = name
+        self.low = float("-inf")
+        self.high = float("inf")
+
+        self.ll = None
+        self.hh = None
+
+        self.constraints = []
+
+    def change(self, low, high):
+        assert self.low <= low\
+            and low <= high\
+            and high <= self.high
+
+        if self.low != low or self.high != high:
+            self.ll = self.low
+            self.hh = self.high
+            self.low = low
+            self.high = high
+            return True
+        else:
+            return False
+
+    def relax(self):
+        count = 0
+        changed_hosts = set()
+        for cons in self.constraints:
+            hosts = cons.relax()
+            count += 1
+            for host in hosts:
+                changed_hosts.add(host)
+        return changed_hosts, count
+
+    @property
+    def determined(self):
+        return self.low == self.high
+
+    @property
+    def ready(self):
+        if self.low != float("-inf") and self.high != float("inf") \
+                and self.low != self.high:
+            return True
+        else:
+            return False
+
+    def adjust(self, distance):
+        if self.ready:
+            if self.low + 2 * distance > self.high:
+                result = (self.low + self.high)/2
+                self.change(result, result)
+                return True
+            guess = self.low + distance
+            if guess > 0:
+                assert guess + distance <= self.high
+                self.change(guess, guess)
+                return True
+            guess = self.high - distance
+            if guess < 0:
+                assert guess - distance >= self.low
+                self.low = guess
+                self.high = guess
+                return True
+            self.change(0, 0)
+            return True
+        else:
+            return False
+
+    def adjust_side(self, distance):
+        if self.low == float("-inf") and self.high == float("inf"):
+            return False
+        elif self.low == float("-inf"):
+            if self.high - distance >= 0:
+                target = 0
+            else:
+                target = self.high - distance
+            self.change(target, target)
+            return True
+        elif self.high == float("inf"):
+            if self.low + distance <= 0:
+                target = 0
+            else:
+                target = self.low + distance
+            self.change(target, target)
+            return True
+        else:
+            return False
+
+    def adjust_none(self):
+        assert self.low == float("-inf")
+        assert self.high == float("inf")
+        self.change(0, 0)
+
+    def __repr__(self):
+        if self.determined:
+            return "<Host %s is %.5f, %d>" \
+                   % (self.name, self.low, len(self.constraints))
+        else:
+            return "<Host %s, (%.5f, %.5f), %d>" \
+                   % (self.name, self.low, self.high, len(self.constraints))
+
+
+class DirectedConstraint(object):
+    def __init__(self, from_host, to_host, r_offset, offset):
+        self.from_ = from_host
+        self.to_ = to_host
+        if r_offset is None:
+            self.low = float("-inf")
+        else:
+            self.low = -r_offset
+        if offset is None:
+            self.high = float("inf")
+        else:
+            self.high = offset
+
+    def relax(self):
+        changed = []
+        low = max(self.low, self.to_.low - self.from_.high)
+        high = min(self.high, self.to_.high - self.from_.low)
+        if low > high:
+            raise RuntimeError("Constraint offset %s violated!" % self)
+        self.low = low
+        self.high = high
+
+        from_l = max(self.from_.low, self.to_.low - self.high)
+        from_h = min(self.from_.high, self.to_.high - self.low)
+        if from_l > from_h:
+            raise RuntimeError("Constraint from %s violated!" % self)
+        try:
+            if self.from_.change(from_l, from_h):
+                changed.append(self.from_)
+        except AssertionError:
+            raise RuntimeError("Constraint from_ %s violated!" % self)
+
+        to_l = max(self.to_.low, self.from_.low + self.low)
+        to_h = min(self.to_.high, self.from_.high + self.high)
+        if to_l > to_h:
+            raise RuntimeError("Constraint to %s violated!" % self)
+        try:
+            if self.to_.change(to_l, to_h):
+                changed.append(self.to_)
+        except AssertionError:
+            raise RuntimeError("Constraint to_ %s violated!" % self)
+
+        return changed
+
+    def __repr__(self):
+        return "<DCon %s->%s (%s, %s)>" \
+               % (self.from_, self.to_, self.low, self.high)
+
+
+class CausalEngine(object):
+    def __init__(self, host_dict, conp_list, distance):
+        self.distance = distance
+        self.hosts = {}
+        self.unknown_hosts = set()
+        self.determined_hosts = set()
+        for host in host_dict.iterkeys():
+            c_host = HostConstraint(host)
+            self.hosts[host] = c_host
+            self.unknown_hosts.add(c_host)
+
+        for conp in conp_list:
+            from_host = self.hosts[conp.from_host]
+            to_host = self.hosts[conp.to_host]
+            dcon = DirectedConstraint(from_host, to_host,
+                                      conp.r_offset, conp.offset)
+            from_host.constraints.append(dcon)
+            to_host.constraints.append(dcon)
+        self.counter = 0
+
+    def relax(self, i_host):
+        init_host = self.hosts[i_host]
+        init_host.adjust_none()
+
+        a_host = init_host
+        while True:
+            self.determined_hosts.add(a_host)
+            self.unknown_hosts.remove(a_host)
+            if not self.unknown_hosts:
+                break
+
+            self.relax_all(a_host)
+
+            a_host = None
+            for host in self.unknown_hosts:
+                if host.adjust(self.distance):
+                    a_host = host
+                    break
+            if a_host is None:
+                for host in self.unknown_hosts:
+                    if host.adjust_side(self.distance):
+                        a_host = host
+                        break
+            if a_host is None:
+                a_host = self.unknown_hosts[0]
+                a_host.adjust_none()
+
+    def relax_all(self, host):
+        changed_hosts = {host}
+        while changed_hosts:
+            next_hosts = set()
+            for host in changed_hosts:
+                hosts, count = host.relax()
+                self.counter += count
+                next_hosts.update(hosts)
+            changed_hosts = next_hosts
