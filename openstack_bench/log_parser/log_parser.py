@@ -211,6 +211,7 @@ class LogFile(object):
                 prv = lg
 
     def set_offset(self, lo, hi):
+        # deprecated
         if lo is not None:
             if self.lo is None:
                 self.lo = lo
@@ -227,7 +228,12 @@ class LogFile(object):
         else:
             return True
 
+    def correct(self, offset):
+        for log in self.log_lines:
+            log.seconds -= offset
+
     def correct_seconds(self):
+        # deprecated
         if self.lo is None:
             return
 

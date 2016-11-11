@@ -155,7 +155,7 @@ class Report(object):
 
 
 class Engine(object):
-    def __init__(self, graph, instances):
+    def __init__(self, graph, instances, log_collector):
         assert isinstance(instances, dict)
         assert isinstance(graph, MasterGraph)
         self.instances = instances
@@ -164,7 +164,7 @@ class Engine(object):
         self.error_instances = []
 
         constraints = self.check()
-        self.relax_constraints(constraints)
+        self.relax_constraints(constraints, log_collector)
         self.parse()
 
     def check(self):
@@ -199,7 +199,10 @@ class Engine(object):
         self.points_to_adjust = adjust_points
         return constraints
 
-    def relax_constraints(self, constraints):
+    def relax_constraints(self, constraints, log_collector):
+        print "-"*20
+        print("\n >> CONSTRAINT REPORT:")
+
         print "Violated requests: %s" % self.requests_to_adjust
         print "Violated constraints:"
         conp_list, host_dict = constraints.group_by_host()
@@ -225,7 +228,33 @@ class Engine(object):
             if host.low != 0:
                 print "    %s" % host
 
+        print
         print "-"*20
+
+        for log_file in log_collector.log_files:
+            name = log_file.host
+            log_file.correct(c_engine.hosts[name].high)
+
+        # check again
+        """
+        print
+        constraints = self.check()
+        print "Violated requests: %s" % self.requests_to_adjust
+        print "Violated constraints:"
+        conp_list, host_dict = constraints.group_by_host()
+        min_dist = None
+        for conp in conp_list:
+            if conp.violated:
+                print "    %s" % conp
+            dist = conp.distance
+            if dist is not None:
+                if min_dist is None:
+                    min_dist = dist
+                else:
+                    min_dist = min(min_dist, dist)
+        print
+        print "-"*20
+        """
 
     def parse(self):
         # sets

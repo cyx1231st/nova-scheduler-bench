@@ -1203,7 +1203,7 @@ def main1():
     engine = parser_engine.ParserEngine(master_graph, log_collector)
     instances = engine.parse()
 
-    s_engine = Engine(master_graph, instances)
+    s_engine = Engine(master_graph, instances, log_collector)
 
     if args.brief:
         s_engine.report(args.folder)
