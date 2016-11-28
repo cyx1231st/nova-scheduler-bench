@@ -80,15 +80,18 @@ class NovaPatcher(bases.BasePatcher):
 
                 scheduler_t = CONF_BENCH.nova_patcher.scheduler_type
                 scheduler_t = SchedulerType[scheduler_t]
-                self.conf("scheduler_driver",
-                          scheduler_t.value[1])
-                self.conf("scheduler_host_manager",
-                          scheduler_t.value[0])
+                # TODO: Newton release changed scheduler option groups
+                self.conf("driver",
+                          scheduler_t.value[1],
+                          "scheduler")
+                self.conf("host_manager",
+                          scheduler_t.value[0],
+                          "scheduler")
 
             self.conf("reserved_host_disk_mb", 0)
             self.conf("reserved_host_memory_mb", 0)
-            self.conf("scheduler_max_attempts", 5)
-            self.conf("scheduler_default_filters",
+            self.conf("max_attempts", 5, "scheduler")
+            self.conf("enabled_filters",
                       ["RetryFilter",
                        "AvailabilityZoneFilter",
                        "RamFilter",
@@ -98,7 +101,8 @@ class NovaPatcher(bases.BasePatcher):
                        "ComputeCapabilitiesFilter",
                        "ImagePropertiesFilter",
                        "ServerGroupAntiAffinityFilter",
-                       "ServerGroupAffinityFilter"])
+                       "ServerGroupAffinityFilter"],
+                      "filter_scheduler")
 
     def run_service(self):
         sys.argv = [""]

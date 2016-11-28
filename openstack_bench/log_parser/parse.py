@@ -1190,7 +1190,10 @@ def main1():
 
     driver_obj = bench_drivers.from_config()
 
+    # build files
     log_collector = LogCollector(args.folder, driver_obj)
+
+    # build logs
     name_errors, mismatch_errors = log_collector.process_logs()
     if name_errors:
         print("duplicated instance names: %s" % len(name_errors))
@@ -1199,12 +1202,18 @@ def main1():
         print("mismatched names and ids: %s" % len(mismatch_errors))
         print("mismatched names and ids: %s" % mismatch_errors)
 
+    # build graph
     master_graph = MasterGraph.build_from_driver(driver_obj)
+
+    # build states
     engine = parser_engine.ParserEngine(master_graph, log_collector)
     instances = engine.parse()
 
-    s_engine = Engine(master_graph, instances, log_collector)
+    # for ins in instances.itervalues():
+    #     print(ins)
 
+    # build statistics
+    s_engine = Engine(master_graph, instances, log_collector)
     if args.brief:
         s_engine.report(args.folder)
     else:

@@ -591,6 +591,7 @@ class HostConstraint(object):
         self.low = float("-inf")
         self.high = float("inf")
 
+        # history
         self.ll = None
         self.hh = None
 
@@ -634,6 +635,7 @@ class HostConstraint(object):
 
     def adjust(self, distance):
         if self.ready:
+            # This may introduce offsets even in single-host mode
             if self.low + 2 * distance > self.high:
                 result = (self.low + self.high)/2
                 self.change(result, result)

@@ -49,7 +49,7 @@ echo "Got token $OS_TOKEN"
 TENANT=`openstack project list | grep " admin" | sed -e "s/ | admin              |//" | sed -e "s/| //"` > /dev/null
 echo "Got tenant id: $TENANT"
 
-IMAGE=`nova image-list | grep "uec " | sed -e "s/ | cirros-0.3.4-x86_64-uec         | ACTIVE |        |//" | sed -e "s/| //"`
+IMAGE=`openstack image list | grep "uec " | sed -e "s/ | cirros-0.3.4-x86_64-uec         | active |//" | sed -e "s/| //"`
 echo "Got image id: $IMAGE"
 
 counter=0

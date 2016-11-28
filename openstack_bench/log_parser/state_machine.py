@@ -96,9 +96,9 @@ class LeafPace(PaceBase):
             return None
 
     def __repr__(self):
-        return "<LeafPace %s %s %s>" % (self.log.request_id,
-                                        self.log.seconds,
-                                        self.log.action)
+        return "<LeafPace (rid)%s (sec)%s %s>" % (self.log.request_id,
+                                                  self.log.seconds,
+                                                  self.log.action)
 
 
 class NestedPace(PaceBase):
@@ -380,7 +380,8 @@ class NestedInstance(InstanceBase):
         return ret_str
 
     def __str__(self):
-        ret_str = super(NestedInstance, self).__str__()
+        ret_str = ">>------------\n"
+        ret_str += super(NestedInstance, self).__str__()
 
         p = self.from_pace
         while p:
